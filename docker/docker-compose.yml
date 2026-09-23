@@ -76,7 +76,7 @@ services:
   
   # 1. API Gateway (Single Entry Point)
   api-gateway:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: api-gateway-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -98,7 +98,7 @@ services:
 
   # 2. Auth Service Container
   auth-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: auth-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -117,7 +117,7 @@ services:
 
   # 3. Account Service Container
   account-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: account-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -134,7 +134,7 @@ services:
 
   # 4. Transaction Service Container (Core Engine & Lock Mechanics)
   transaction-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: transaction-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -155,7 +155,7 @@ services:
 
   # 5. Outbox Publisher Container
   outbox-publisher:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: outbox-publisher-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -174,7 +174,7 @@ services:
 
   # 6. Audit Service Container (PostgreSQL Immutable Audit Consumer)
   audit-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: audit-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -193,7 +193,7 @@ services:
 
   # 7. Reconciliation Service Container
   reconciliation-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: reconciliation-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
@@ -213,7 +213,7 @@ services:
 
   # 8. Notification Service Container
   notification-service:
-    image: eclipse-temurin:17-jre-alpine
+    image: core-retail-ledger-engine:latest
     container_name: notification-service-container
     volumes:
       - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
