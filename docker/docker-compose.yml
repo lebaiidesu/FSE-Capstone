@@ -1,6 +1,9 @@
 version: "3.9"
 
 services:
+  # -------------------------------------------------------------
+  # DATASTORES & INFRASTRUCTURE
+  # -------------------------------------------------------------
   oracle-xe:
     image: gvenzl/oracle-xe:21-slim
     container_name: ledger-oracle
@@ -12,7 +15,7 @@ services:
       - "1522:1521"
     volumes:
       - oracle_data:/opt/oracle/oradata
-      - ../backend/src/main/resources/schema-oracle.sql:/container-entrypoint-initdb.d/01_schema.sql
+      - ../transaction-service/src/main/resources/schema-oracle.sql:/container-entrypoint-initdb.d/01_schema.sql
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
       interval: 15s
@@ -31,7 +34,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../backend/src/main/resources/schema-postgres.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ../audit-service/src/main/resources/schema-postgres.sql:/docker-entrypoint-initdb.d/01_schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -52,6 +55,176 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: ledger-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: ledger-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://ledger-kafka:9092,PLAINTEXT_INTERNAL://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # -------------------------------------------------------------
+  # MICROSERVICES
+  # -------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ../api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - account-service
+      - transaction-service
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ../auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      ORACLE_HOST: oracle-xe
+      ORACLE_APP_USER: ${ORACLE_APP_USER}
+      ORACLE_APP_USER_PASSWORD: ${ORACLE_APP_USER_PASSWORD}
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+    restart: unless-stopped
+
+  account-service:
+    build:
+      context: ../account-service
+      dockerfile: Dockerfile
+    container_name: account-service
+    ports:
+      - "8082:8082"
+    environment:
+      ORACLE_HOST: oracle-xe
+      ORACLE_APP_USER: ${ORACLE_APP_USER}
+      ORACLE_APP_USER_PASSWORD: ${ORACLE_APP_USER_PASSWORD}
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+    restart: unless-stopped
+
+  transaction-service:
+    build:
+      context: ../transaction-service
+      dockerfile: Dockerfile
+    container_name: transaction-service
+    ports:
+      - "8083:8083"
+    environment:
+      ORACLE_HOST: oracle-xe
+      ORACLE_APP_USER: ${ORACLE_APP_USER}
+      ORACLE_APP_USER_PASSWORD: ${ORACLE_APP_USER_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox-publisher:
+    build:
+      context: ../outbox-publisher
+      dockerfile: Dockerfile
+    container_name: outbox-publisher
+    ports:
+      - "8084:8084"
+    environment:
+      ORACLE_HOST: oracle-xe
+      ORACLE_APP_USER: ${ORACLE_APP_USER}
+      ORACLE_APP_USER_PASSWORD: ${ORACLE_APP_USER_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ledger-kafka:9092
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
+  audit-service:
+    build:
+      context: ../audit-service
+      dockerfile: Dockerfile
+    container_name: audit-service
+    ports:
+      - "8085:8085"
+    environment:
+      POSTGRES_HOST: postgres-audit
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ledger-kafka:9092
+    depends_on:
+      postgres-audit:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+
+  reconciliation-service:
+    build:
+      context: ../reconciliation-service
+      dockerfile: Dockerfile
+    container_name: reconciliation-service
+    ports:
+      - "8086:8086"
+    environment:
+      POSTGRES_HOST: postgres-audit
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ORACLE_HOST: oracle-xe
+      ORACLE_APP_USER: ${ORACLE_APP_USER}
+      ORACLE_APP_USER_PASSWORD: ${ORACLE_APP_USER_PASSWORD}
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+      postgres-audit:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ../notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8087:8087"
+    environment:
+      POSTGRES_HOST: postgres-audit
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ledger-kafka:9092
+    depends_on:
+      postgres-audit:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

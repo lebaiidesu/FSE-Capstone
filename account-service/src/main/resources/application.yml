@@ -1,0 +1,22 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: account-service
+  datasource:
+    url: jdbc:oracle:thin:@${ORACLE_HOST:ledger-oracle}:1521/XEPDB1
+    username: ${ORACLE_APP_USER:app_user}
+    password: ${ORACLE_APP_USER_PASSWORD:app_password}
+    driver-class-name: oracle.jdbc.OracleDriver
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus

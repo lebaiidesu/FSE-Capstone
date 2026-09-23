@@ -1,0 +1,25 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: reconciliation-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:ledger-postgres}:5432/${POSTGRES_DB:ledger_audit}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+reconciliation:
+  cron: "0 */15 * * * *" # Run every 15 minutes
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus

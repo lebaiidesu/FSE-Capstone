@@ -1,0 +1,31 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: outbox-publisher
+  datasource:
+    url: jdbc:oracle:thin:@${ORACLE_HOST:ledger-oracle}:1521/XEPDB1
+    username: ${ORACLE_APP_USER:app_user}
+    password: ${ORACLE_APP_USER_PASSWORD:app_password}
+    driver-class-name: oracle.jdbc.OracleDriver
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:ledger-kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+outbox:
+  poll-interval-ms: 2000
+  batch-size: 50
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
