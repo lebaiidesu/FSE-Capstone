@@ -1,7 +1,7 @@
 services:
-  # ==========================================
+  # =========================================================================
   # Layer 4: Datastores & In-Memory Matrix
-  # ==========================================
+  # =========================================================================
   oracle-xe:
     image: gvenzl/oracle-xe:21-slim
     container_name: oracle-xe-master
@@ -41,9 +41,9 @@ services:
     networks:
       - ledger-net
 
-  # ==========================================
+  # =========================================================================
   # Layer 5: Event Streaming (Apache Kafka)
-  # ==========================================
+  # =========================================================================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -70,14 +70,17 @@ services:
     networks:
       - ledger-net
 
-  # ==========================================
-  # Layer 2 & 3: Core Engine & Microservices
-  # ==========================================
-  core-retail-ledger-engine:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-    container_name: core-retail-ledger-app
+  # =========================================================================
+  # Layer 2 & 3: Core Microservices (Distinct Dedicated Containers)
+  # =========================================================================
+  
+  # 1. API Gateway (Single Entry Point)
+  api-gateway:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: api-gateway-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-jar", "/app/app.jar"]
     depends_on:
       - oracle-xe
       - postgresql
@@ -86,17 +89,150 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-xe:1521/XE
-      - SPRING_DATASOURCE_USERNAME=ledger_master
-      - SPRING_DATASOURCE_PASSWORD=MasterSecretPassword123
+      - SPRING_APPLICATION_NAME=api-gateway
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     networks:
       - ledger-net
 
-  # ==========================================
+  # 2. Auth Service Container
+  auth-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: auth-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8081", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+      - redis
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_APPLICATION_NAME=auth-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_DATA_REDIS_HOST=redis
+    networks:
+      - ledger-net
+
+  # 3. Account Service Container
+  account-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: account-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8082", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_APPLICATION_NAME=account-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+    networks:
+      - ledger-net
+
+  # 4. Transaction Service Container (Core Engine & Lock Mechanics)
+  transaction-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: transaction-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8083", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+      - redis
+      - kafka
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_APPLICATION_NAME=transaction-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - ledger-net
+
+  # 5. Outbox Publisher Container
+  outbox-publisher:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: outbox-publisher-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8084", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+      - kafka
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_APPLICATION_NAME=outbox-publisher
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - ledger-net
+
+  # 6. Audit Service Container (PostgreSQL Immutable Audit Consumer)
+  audit-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: audit-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8085", "-jar", "/app/app.jar"]
+    depends_on:
+      - postgresql
+      - kafka
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_APPLICATION_NAME=audit-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - ledger-net
+
+  # 7. Reconciliation Service Container
+  reconciliation-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: reconciliation-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8086", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+      - postgresql
+      - kafka
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_APPLICATION_NAME=reconciliation-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - ledger-net
+
+  # 8. Notification Service Container
+  notification-service:
+    image: eclipse-temurin:17-jre-alpine
+    container_name: notification-service-container
+    volumes:
+      - ./../backend/target/core-retail-ledger-engine-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8087", "-jar", "/app/app.jar"]
+    depends_on:
+      - postgresql
+      - kafka
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_APPLICATION_NAME=notification-service
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - ledger-net
+
+  # =========================================================================
   # Layer 6: Observability & Telemetry
-  # ==========================================
+  # =========================================================================
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: prometheus-telemetry
