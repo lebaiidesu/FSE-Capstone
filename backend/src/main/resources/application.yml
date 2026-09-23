@@ -1,0 +1,82 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: core-retail-ledger-engine
+  
+  # Relational Persistence & HikariCP Configuration (Day 32 Requirement)
+  datasource:
+    url: jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 5000
+      pool-name: RetailLedgerHikariPool
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 50
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Redis In-Memory Validation & Idempotency Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
+
+  # Asynchronous Kafka Streaming Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: core-ledger-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Security & JWT Configuration
+app:
+  security:
+    jwt-secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+    jwt-expiration-ms: 86400000 # 24 Hours
+
+# Actuator & OpenTelemetry Prometheus Metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        ledger.mutation.latency: true
