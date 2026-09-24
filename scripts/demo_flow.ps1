@@ -11,7 +11,7 @@ Write-Host "`n[1/4] Authenticating as Juan Dela Cruz (ROLE_CUSTOMER)..." -Foregr
 $loginBody = '{"username":"jdelacruz","password":"CustomerPass123!"}'
 
 try {
-    $authResp = Invoke-RestMethod -Uri "$GATEWAY/api/v1/auth/login" -Method Post -Body $loginBody -ContentType "application/json"
+    $authResp = Invoke-RestMethod -Uri "$GATEWAY/api/v1/auth/login" -Method Post -Body $loginBody -ContentType "application/json" -UseBasicParsing
     $token = $authResp.token
     Write-Host "[OK] Authentication successful!" -ForegroundColor Green
     Write-Host "     Customer: $($authResp.fullName) ($($authResp.username))" -ForegroundColor Gray
@@ -25,7 +25,7 @@ try {
 Write-Host "`n[2/4] Querying Account #1 Initial Balance..." -ForegroundColor Cyan
 $headers = @{ "Authorization" = "Bearer $token" }
 try {
-    $account = Invoke-RestMethod -Uri "$GATEWAY/api/v1/accounts/1" -Method Get -Headers $headers
+    $account = Invoke-RestMethod -Uri "$GATEWAY/api/v1/accounts/1" -Method Get -Headers $headers -UseBasicParsing
     Write-Host "[OK] Account Number: $($account.accountNumber)" -ForegroundColor Green
     Write-Host "     Current Balance: PHP $($account.currentBalance)" -ForegroundColor Yellow
 } catch {
@@ -45,7 +45,7 @@ $mutationHeaders = @{
 }
 
 try {
-    $txResult = Invoke-RestMethod -Uri "$GATEWAY/api/v1/ledger/mutate" -Method Post -Body $mutationBody -Headers $mutationHeaders
+    $txResult = Invoke-RestMethod -Uri "$GATEWAY/api/v1/ledger/mutate" -Method Post -Body $mutationBody -Headers $mutationHeaders -UseBasicParsing
     Write-Host "[OK] Transaction Succeeded!" -ForegroundColor Green
     Write-Host "     Reference No:    $($txResult.referenceNo)" -ForegroundColor Green
     Write-Host "     Previous Balance: PHP $($txResult.beforeBalance)" -ForegroundColor Gray
@@ -58,7 +58,7 @@ try {
 # 4. Test Idempotency Replay
 Write-Host "`n[4/4] Testing Idempotency Replay (Resending exact same payload and key)..." -ForegroundColor Cyan
 try {
-    $replayResp = Invoke-WebRequest -Uri "$GATEWAY/api/v1/ledger/mutate" -Method Post -Body $mutationBody -Headers $mutationHeaders
+    $replayResp = Invoke-WebRequest -Uri "$GATEWAY/api/v1/ledger/mutate" -Method Post -Body $mutationBody -Headers $mutationHeaders -UseBasicParsing
     $isReplay = $replayResp.Headers["Idempotent-Replay"]
     Write-Host "[OK] Replay Accepted without Double-Charging!" -ForegroundColor Green
     Write-Host "     HTTP Status:        $($replayResp.StatusCode)" -ForegroundColor Green

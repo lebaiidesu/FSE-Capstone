@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: event-consumers
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.h2.Driver}
+  sql:
+    init:
+      mode: never
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: true
+
+app:
+  datasource:
+    postgres:
+      url: ${SPRING_DATASOURCE_POSTGRES_URL:jdbc:postgresql://localhost:5432/ledger_audit_db}
+      username: ${SPRING_DATASOURCE_POSTGRES_USERNAME:audit_user}
+      password: ${SPRING_DATASOURCE_POSTGRES_PASSWORD:AuditSecretPassword123}
+      driver-class-name: org.postgresql.Driver
+    oracle:
+      url: ${SPRING_DATASOURCE_ORACLE_URL:jdbc:oracle:thin:@//localhost:1521/XEPDB1}
+      username: ${SPRING_DATASOURCE_ORACLE_USERNAME:ledger_master}
+      password: ${SPRING_DATASOURCE_ORACLE_PASSWORD:MasterSecretPassword123}
+      driver-class-name: oracle.jdbc.OracleDriver
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

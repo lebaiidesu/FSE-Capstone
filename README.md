@@ -42,15 +42,21 @@ cd docker
 docker compose up -d
 ```
 
-### 2. Run Backend Locally with Maven
+### 2. Run Backend Locally with Maven (Multi-Module Microservices)
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 cd backend
-mvn spring-boot:run
+mvn clean package -DskipTests
 ```
 
-### 3. Open Banking Web Application (SPA UI)
-Open `frontend/index.html` in your browser.
+### 3. Microservice Ports & Topology
+| Module | Port | Responsibility / Storage |
+|---|---|---|
+| **`gateway`** | `8080` | Spring Cloud Gateway, JWT Filter, Redis Rate Limiting |
+| **`ledger-core`** | `8083` | Master OLTP Mutation Engine, Outbox Publisher (Oracle XE 21c + Redis) |
+| **`event-consumers`** | `8085` | Financial Mutation Audit & Reconciliation Sweep (PostgreSQL 15 + Oracle Read-Only) |
+| **`notification-service`** | `8087` | Real-time Customer SMS/Email Alerts (PostgreSQL 15) |
+| **`ledger-common`** | N/A | Shared DTOs, Event Models, and RFC-7807 ProblemDetails |
 
 ---
 
@@ -66,11 +72,17 @@ mvn test
 
 ---
 
-##  Repository Structure
+## 📂 Repository Structure
 ```
 core-retail-ledger-fse/
-├── backend/          # Spring Boot 3.2 Microservices & Core Mutation Engine
-├── frontend/         # PayPink Philippine FinTech Banking SPA (Pink Theme)
-├── docker/           # Docker Compose, Prometheus config, and JMeter stress test
-└── docs/             # Architecture Specifications, JIRA Sprint Backlog, and SonarQube Report
+├── backend/
+│   ├── pom.xml                   # Root Parent POM (Spring Cloud 2023.0.1, Spring Boot 3.2.3)
+│   ├── ledger-common/            # Shared DTOs, ProblemDetails & Outbox Event schemas
+│   ├── ledger-core/              # Oracle OLTP Master Ledger, Auth, Pessimistic Lock & Outbox
+│   ├── event-consumers/          # Immutable Audit Log & Cross-DB Reconciliation Consumers
+│   ├── notification-service/     # Asynchronous Notification Kafka Consumer
+│   └── gateway/                  # Spring Cloud Gateway (Port 8080) with Redis Rate Limiter
+├── frontend/                     # PayPink Philippine FinTech Banking SPA (Pink Theme)
+├── docker/                       # Docker Compose, Prometheus config, and JMeter stress test
+└── docs/                         # Architecture Specifications, JIRA Sprint Backlog, and SonarQube Report
 ```
