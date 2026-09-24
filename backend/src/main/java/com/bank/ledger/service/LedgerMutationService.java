@@ -212,20 +212,24 @@ public class LedgerMutationService {
         );
 
         // 9. Register Transaction Synchronization for Redis Idempotency
-        if (idempotencyKey != null && !idempotencyKey.isBlank() && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    idempotencyService.complete(idempotencyKey, response);
-                }
-
-                @Override
-                public void afterCompletion(int status) {
-                    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-                        idempotencyService.release(idempotencyKey);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        idempotencyService.complete(idempotencyKey, response);
                     }
-                }
-            });
+
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                            idempotencyService.release(idempotencyKey);
+                        }
+                    }
+                });
+            } else {
+                idempotencyService.complete(idempotencyKey, response);
+            }
         }
 
         telemetryService.recordMutation(false, System.nanoTime() - startTimeNanos);

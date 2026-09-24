@@ -231,8 +231,32 @@ services:
       - ledger-net
 
   # =========================================================================
-  # Layer 6: Observability & Telemetry
+  # Layer 6: Observability, Telemetry & Distributed Tracing
   # =========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.88.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector.yml"]
+    volumes:
+      - ./otel-collector.yml:/etc/otel-collector.yml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus metrics exporter
+    networks:
+      - ledger-net
+
+  tempo:
+    image: grafana/tempo:2.2.4
+    container_name: tempo-distributed-tracing
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200" # Tempo HTTP
+    networks:
+      - ledger-net
+
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: prometheus-telemetry
@@ -250,9 +274,12 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+      - tempo
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
     networks:
       - ledger-net
 
@@ -263,3 +290,4 @@ networks:
 volumes:
   oracle_data:
   postgres_data:
+
