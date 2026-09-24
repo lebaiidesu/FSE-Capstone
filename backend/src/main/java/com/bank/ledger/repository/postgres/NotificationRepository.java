@@ -8,6 +8,8 @@ import java.util.List;
 
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
+    boolean existsByReferenceNo(String referenceNo);
     List<Notification> findByCustomerIdOrderByCreatedDateDesc(Long customerId);
     List<Notification> findTop50ByOrderByCreatedDateDesc();
 }
+

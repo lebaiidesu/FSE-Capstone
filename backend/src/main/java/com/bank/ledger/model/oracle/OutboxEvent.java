@@ -25,6 +25,15 @@ public class OutboxEvent {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "PENDING"; // 'PENDING', 'PROCESSED', 'FAILED'
 
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount = 0;
+
+    @Column(name = "next_attempt_at", nullable = false)
+    private LocalDateTime nextAttemptAt = LocalDateTime.now();
+
+    @Column(name = "last_error", length = 500)
+    private String lastError;
+
     @Column(name = "created_date", nullable = false, updatable = false)
     private LocalDateTime createdDate = LocalDateTime.now();
 
@@ -38,6 +47,8 @@ public class OutboxEvent {
         this.eventType = eventType;
         this.payload = payload;
         this.status = "PENDING";
+        this.retryCount = 0;
+        this.nextAttemptAt = LocalDateTime.now();
         this.createdDate = LocalDateTime.now();
     }
 
@@ -55,6 +66,15 @@ public class OutboxEvent {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public Integer getRetryCount() { return retryCount; }
+    public void setRetryCount(Integer retryCount) { this.retryCount = retryCount; }
+
+    public LocalDateTime getNextAttemptAt() { return nextAttemptAt; }
+    public void setNextAttemptAt(LocalDateTime nextAttemptAt) { this.nextAttemptAt = nextAttemptAt; }
+
+    public String getLastError() { return lastError; }
+    public void setLastError(String lastError) { this.lastError = lastError; }
 
     public LocalDateTime getCreatedDate() { return createdDate; }
     public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }

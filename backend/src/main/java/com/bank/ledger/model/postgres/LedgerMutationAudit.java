@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "LEDGER_MUTATION_AUDIT")
+@Table(name = "LEDGER_MUTATION_AUDIT", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_audit_tx_account", columnNames = {"transaction_id", "account_id"})
+})
 public class LedgerMutationAudit {
 
     @Id
@@ -19,8 +21,8 @@ public class LedgerMutationAudit {
     @Column(name = "account_id", nullable = false)
     private Long accountId;
 
-    @Column(name = "operation", nullable = false, length = 20)
-    private String operation; // 'DEBIT', 'CREDIT'
+    @Column(name = "entry_type", nullable = false, length = 10)
+    private String entryType; // 'DEBIT', 'CREDIT'
 
     @Column(name = "amount", nullable = false, precision = 18, scale = 4)
     private BigDecimal amount;
@@ -39,11 +41,11 @@ public class LedgerMutationAudit {
 
     public LedgerMutationAudit() {}
 
-    public LedgerMutationAudit(Long transactionId, Long accountId, String operation, BigDecimal amount,
+    public LedgerMutationAudit(Long transactionId, Long accountId, String entryType, BigDecimal amount,
                                String currency, BigDecimal beforeBalance, BigDecimal afterBalance) {
         this.transactionId = transactionId;
         this.accountId = accountId;
-        this.operation = operation;
+        this.entryType = entryType;
         this.amount = amount;
         this.currency = currency;
         this.beforeBalance = beforeBalance;
@@ -60,8 +62,11 @@ public class LedgerMutationAudit {
     public Long getAccountId() { return accountId; }
     public void setAccountId(Long accountId) { this.accountId = accountId; }
 
-    public String getOperation() { return operation; }
-    public void setOperation(String operation) { this.operation = operation; }
+    public String getEntryType() { return entryType; }
+    public void setEntryType(String entryType) { this.entryType = entryType; }
+
+    public String getOperation() { return entryType; }
+    public void setOperation(String operation) { this.entryType = operation; }
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }

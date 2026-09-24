@@ -97,7 +97,7 @@ public class IdempotencyAndOutboxTest {
         assertFalse(outboxList.isEmpty(), "Outbox table must contain event");
 
         // Verify PostgreSQL Immutable Audit Log entry
-        Optional<LedgerMutationAudit> auditOpt = ledgerMutationAuditRepository.findByTransactionId(res.getTransactionId());
+        Optional<LedgerMutationAudit> auditOpt = ledgerMutationAuditRepository.findByTransactionIdAndAccountId(res.getTransactionId(), account.getAccountId());
         assertTrue(auditOpt.isPresent(), "PostgreSQL LEDGER_MUTATION_AUDIT must contain record for transaction");
         assertEquals(0, new BigDecimal("500.0000").compareTo(auditOpt.get().getAmount()));
 

@@ -12,28 +12,35 @@ CREATE TABLE LEDGER_MUTATION_AUDIT (
     audit_id         BIGSERIAL PRIMARY KEY,
     transaction_id   BIGINT NOT NULL,
     account_id       BIGINT NOT NULL,
-    operation        VARCHAR(20) NOT NULL CHECK (operation IN ('DEBIT', 'CREDIT')),
+    entry_type       VARCHAR(10) NOT NULL CHECK (entry_type IN ('DEBIT', 'CREDIT')),
     amount           NUMERIC(18,4) NOT NULL CHECK (amount > 0.0000),
     currency         VARCHAR(10) DEFAULT 'PHP' NOT NULL,
     before_balance   NUMERIC(18,4) NOT NULL,
     after_balance    NUMERIC(18,4) NOT NULL,
-    created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT uq_audit_tx_account UNIQUE (transaction_id, account_id)
 );
 
 -- 2. RECONCILIATION_LOG TABLE (Cross-Database Integrity & Drift Detection)
 CREATE TABLE RECONCILIATION_LOG (
     recon_id         BIGSERIAL PRIMARY KEY,
     transaction_id   BIGINT NOT NULL,
+    account_id       BIGINT NOT NULL,
     oracle_status    VARCHAR(30) NOT NULL,
     postgres_status  VARCHAR(30) NOT NULL,
     recon_status     VARCHAR(30) NOT NULL, -- 'MATCHED', 'DRIFT_DETECTED'
-    recon_date       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    mismatch_fields  VARCHAR(200),
+    check_count      INT DEFAULT 1 NOT NULL,
+    last_checked_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    recon_date       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT uq_recon_tx_account UNIQUE (transaction_id, account_id)
 );
 
 -- 3. NOTIFICATION TABLE (Customer Alert Dispatch History)
 CREATE TABLE NOTIFICATION (
     notification_id  BIGSERIAL PRIMARY KEY,
     customer_id      BIGINT NOT NULL,
+    reference_no     VARCHAR(64),
     message          TEXT NOT NULL,
     status           VARCHAR(20) NOT NULL CHECK (status IN ('SENT', 'FAILED', 'RETRY')),
     created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL

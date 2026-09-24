@@ -9,8 +9,11 @@ import java.util.Optional;
 
 @Repository
 public interface ReconciliationLogRepository extends JpaRepository<ReconciliationLog, Long> {
+    Optional<ReconciliationLog> findByTransactionIdAndAccountId(Long transactionId, Long accountId);
     Optional<ReconciliationLog> findTopByTransactionIdOrderByReconDateDesc(Long transactionId);
     List<ReconciliationLog> findByTransactionId(Long transactionId);
     List<ReconciliationLog> findByReconStatusOrderByReconDateDesc(String reconStatus);
     List<ReconciliationLog> findTop50ByOrderByReconDateDesc();
+    long countByReconStatus(String reconStatus);
 }
+

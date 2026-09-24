@@ -2,7 +2,7 @@ package com.bank.ledger.controller;
 
 import com.bank.ledger.dto.MutationRequest;
 import com.bank.ledger.dto.MutationResponse;
-import com.bank.ledger.service.LedgerMutationService;
+import com.bank.ledger.service.LedgerMutationFacade;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin(origins = "*")
 public class LedgerMutationController {
 
-    private final LedgerMutationService ledgerMutationService;
+    private final LedgerMutationFacade ledgerMutationFacade;
 
-    public LedgerMutationController(LedgerMutationService ledgerMutationService) {
-        this.ledgerMutationService = ledgerMutationService;
+    public LedgerMutationController(LedgerMutationFacade ledgerMutationFacade) {
+        this.ledgerMutationFacade = ledgerMutationFacade;
     }
 
     /**
@@ -34,7 +34,8 @@ public class LedgerMutationController {
         }
 
         String username = authentication != null ? authentication.getName() : "jdelacruz";
-        MutationResponse response = ledgerMutationService.mutateBalance(request, username);
+        MutationResponse response = ledgerMutationFacade.executeMutation(request, username);
         return ResponseEntity.ok(response);
     }
 }
+

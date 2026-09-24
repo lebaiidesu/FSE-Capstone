@@ -92,18 +92,21 @@ CREATE TABLE OUTBOX_EVENT (
     transaction_id   NUMBER(19) NOT NULL,
     event_type       VARCHAR2(50) NOT NULL, -- 'TRANSACTION_SUCCESS', 'TRANSACTION_FAILED'
     payload          CLOB NOT NULL,
-    status           VARCHAR2(20) DEFAULT 'PENDING' NOT NULL, -- 'PENDING', 'PROCESSED', 'FAILED'
+    status           VARCHAR2(20) DEFAULT 'PENDING' NOT NULL, -- 'PENDING', 'PROCESSED', 'DEAD', 'FAILED'
+    retry_count      NUMBER(3) DEFAULT 0 NOT NULL,
+    next_attempt_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error       VARCHAR2(500),
     created_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     processed_date   TIMESTAMP,
     CONSTRAINT fk_outbox_transaction FOREIGN KEY (transaction_id) REFERENCES TRANSACTION(transaction_id)
 );
 
--- Indexes for high-throughput concurrency
+-- Indexes for high-throughput concurrency & outbox polling
 CREATE INDEX idx_account_cust_id ON ACCOUNT(customer_id);
 CREATE INDEX idx_account_num ON ACCOUNT(account_number);
 CREATE INDEX idx_tx_from_acc ON TRANSACTION(from_account_id);
 CREATE INDEX idx_tx_ref_no ON TRANSACTION(reference_no);
-CREATE INDEX idx_outbox_status ON OUTBOX_EVENT(status, created_date);
+CREATE INDEX idx_outbox_poll ON OUTBOX_EVENT(status, next_attempt_at);
 CREATE INDEX idx_audit_cust_id ON AUDIT_LOG(customer_id, timestamp);
 
 -- Seed Initial Retail Banking Customer & Accounts (Philippine Context)
