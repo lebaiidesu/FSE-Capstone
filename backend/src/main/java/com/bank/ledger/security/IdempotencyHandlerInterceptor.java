@@ -37,6 +37,9 @@ public class IdempotencyHandlerInterceptor implements HandlerInterceptor {
 
         String idempotencyKey = request.getHeader("Idempotency-Key");
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            idempotencyKey = request.getHeader("X-Idempotency-Key");
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
             writeRfc7807Error(response, HttpStatus.BAD_REQUEST,
                     "https://api.paypink.ph/errors/missing-idempotency-key",
                     "Missing Idempotency-Key",

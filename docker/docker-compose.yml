@@ -274,7 +274,6 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
-      - tempo
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

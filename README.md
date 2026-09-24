@@ -4,7 +4,7 @@
 
 ---
 
-## 🏛️ System Architecture Overview
+## System Architecture Overview
 
 ```
 1. Client Layer      ──> PayPink SPA / JMeter (800+ TPS Load Generator)
@@ -17,7 +17,7 @@
 
 ---
 
-## 📊 Database Schema & ERD Topology
+## Database Schema & ERD Topology
 
 * **Oracle XE 21c (Master OLTP & Security Engine)**:
   * `CUSTOMER` - User accounts & credentials.
@@ -34,7 +34,7 @@
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### 1. Run via Docker Compose (All 8 Containers)
 ```bash
@@ -54,7 +54,7 @@ Open `frontend/index.html` in your browser.
 
 ---
 
-## 🧪 Automated Testing & Concurrency Verification
+## Automated Testing & Concurrency Verification
 ```powershell
 cd backend
 mvn test
@@ -66,7 +66,7 @@ mvn test
 
 ---
 
-## 📁 Repository Structure
+##  Repository Structure
 ```
 core-retail-ledger-fse/
 ├── backend/          # Spring Boot 3.2 Microservices & Core Mutation Engine
