@@ -90,6 +90,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
     }
 
+    @ExceptionHandler(InvalidTransferException.class)
+    public ResponseEntity<ProblemDetails> handleInvalidTransfer(InvalidTransferException ex, HttpServletRequest request) {
+        ProblemDetails problem = new ProblemDetails(
+                "https://api.paypink.ph/errors/invalid-transfer",
+                "Invalid Transfer Request",
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
+    }
+
     @ExceptionHandler(PessimisticLockingFailureException.class)
     public ResponseEntity<ProblemDetails> handleLockContention(PessimisticLockingFailureException ex, HttpServletRequest request) {
         ProblemDetails problem = new ProblemDetails(

@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import java.util.List;
 
 @Service
 public class IdempotencyService {
@@ -210,6 +212,28 @@ public class IdempotencyService {
             this.expiryTime = expiryTime;
             this.responseObj = responseObj;
         }
+    }
+
+        // Deletes the key only if its value is still IN_PROGRESS (atomic check-and-delete in Redis)
+    private static final DefaultRedisScript<Long> RELEASE_IF_IN_PROGRESS = new DefaultRedisScript<>(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+            Long.class);
+
+    /**
+     * Releases a reservation only if it has not been completed.
+     * Never deletes a cached successful response.
+     */
+    public void releaseIfInProgress(String key) {
+        if (key == null || key.isBlank()) return;
+        try {
+            if (redisTemplate != null) {
+                redisTemplate.execute(RELEASE_IF_IN_PROGRESS, List.of(PREFIX + key), IN_PROGRESS);
+            }
+        } catch (Exception ignored) {
+            // Redis unavailable: the 30s TTL on the reservation still frees the key
+        }
+        // Fallback map (to be removed in C5)
+        fallbackCache.computeIfPresent(key, (k, e) -> IN_PROGRESS.equals(e.status) && e.rawJson == null ? null : e);
     }
 }
 

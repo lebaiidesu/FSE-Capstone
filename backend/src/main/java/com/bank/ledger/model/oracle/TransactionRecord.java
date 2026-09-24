@@ -43,6 +43,12 @@ public class TransactionRecord {
     @Column(name = "transaction_date", nullable = false, updatable = false)
     private LocalDateTime transactionDate = LocalDateTime.now();
 
+    @Column(name = "operation", nullable = false, length = 10)
+    private String operation; // 'DEBIT' or 'CREDIT'
+
+    public String getOperation() { return operation; }
+    public void setOperation(String operation) { this.operation = operation; }
+
     public TransactionRecord() {}
 
     public TransactionRecord(Long fromAccountId, Long toAccountId, BigDecimal amount, String sourceCurrency,

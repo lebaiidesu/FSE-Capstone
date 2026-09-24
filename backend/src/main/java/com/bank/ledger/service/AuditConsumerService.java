@@ -27,7 +27,7 @@ public class AuditConsumerService {
      * Appends immutable audit entry to PostgreSQL LEDGER_MUTATION_AUDIT table.
      * Idempotently skips duplicates and safely handles unique constraint collisions.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+
     public LedgerMutationAudit consumeAuditEvent(Long transactionId, Long accountId, String entryType,
                                                  BigDecimal amount, String currency, BigDecimal beforeBalance,
                                                  BigDecimal afterBalance) {
@@ -51,7 +51,7 @@ public class AuditConsumerService {
                     beforeBalance,
                     afterBalance
             );
-            return ledgerMutationAuditRepository.save(audit);
+            return ledgerMutationAuditRepository.saveAndFlush(audit);
         } catch (DataIntegrityViolationException ex) {
             log.warn("Unique constraint collision for txId={}, accountId={}. Handled idempotently.", transactionId, accountId);
             return ledgerMutationAuditRepository.findByTransactionIdAndAccountId(transactionId, accountId).orElse(null);

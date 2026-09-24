@@ -15,17 +15,20 @@ public class Notification {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
-    @Column(name = "reference_no", length = 64)
+    @Column(name = "reference_no", nullable = false, unique = true, length = 64)
     private String referenceNo;
 
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
 
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // 'SENT', 'FAILED', 'RETRY'
+    private String status; // 'PENDING', 'SENT', 'FAILED', 'RETRY'
 
     @Column(name = "created_date", nullable = false, updatable = false)
     private LocalDateTime createdDate = LocalDateTime.now();
+
+    @Column(name = "updated_date")
+    private LocalDateTime updatedDate;
 
     public Notification() {}
 
@@ -61,4 +64,7 @@ public class Notification {
 
     public LocalDateTime getCreatedDate() { return createdDate; }
     public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
+
+    public LocalDateTime getUpdatedDate() { return updatedDate; }
+    public void setUpdatedDate(LocalDateTime updatedDate) { this.updatedDate = updatedDate; }
 }

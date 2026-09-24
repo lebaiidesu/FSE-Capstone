@@ -77,13 +77,15 @@ CREATE TABLE TRANSACTION (
     source_currency  VARCHAR2(10) DEFAULT 'PHP' NOT NULL,
     target_currency  VARCHAR2(10) DEFAULT 'PHP' NOT NULL,
     transaction_type VARCHAR2(30) NOT NULL, -- 'DEBIT', 'CREDIT', 'TRANSFER_INSTAPAY', 'TRANSFER_PESONET', 'TRANSFER_QRPH'
+    operation        VARCHAR2(10) NOT NULL,  -- 'DEBIT' or 'CREDIT' (direction of the source-account leg)
     reference_no     VARCHAR2(64) NOT NULL UNIQUE,
     status           VARCHAR2(20) NOT NULL, -- 'SUCCESS', 'FAILED'
     failure_reason   VARCHAR2(255),
     transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT fk_tx_from_account FOREIGN KEY (from_account_id) REFERENCES ACCOUNT(account_id),
     CONSTRAINT fk_tx_to_account FOREIGN KEY (to_account_id) REFERENCES ACCOUNT(account_id),
-    CONSTRAINT chk_tx_amount_positive CHECK (amount > 0.0000)
+    CONSTRAINT chk_tx_amount_positive CHECK (amount > 0.0000),
+    CONSTRAINT chk_tx_operation CHECK (operation IN ('DEBIT', 'CREDIT'))
 );
 
 -- 5. OUTBOX_EVENT TABLE (Transactional Outbox Pattern for Kafka Streaming)

@@ -5,6 +5,7 @@ import com.bank.ledger.dto.MutationResponse;
 import com.bank.ledger.exception.AccountNotFoundException;
 import com.bank.ledger.exception.CurrencyMismatchException;
 import com.bank.ledger.exception.InsufficientFundsException;
+import com.bank.ledger.exception.InvalidTransferException;
 import com.bank.ledger.model.oracle.Account;
 import com.bank.ledger.model.oracle.AuditLog;
 import com.bank.ledger.model.oracle.OutboxEvent;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.bank.ledger.exception.InvalidTransferException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -71,15 +73,23 @@ public class LedgerMutationService {
         long startTimeNanos = System.nanoTime();
         final String idempotencyKey = request.getIdempotencyKey();
 
-        // 1. Validate distinct accounts if transfer
+                // 1. Request-shape validation (no locks held yet)
         Long srcId = request.getAccountId();
         Long tgtId = request.getTargetAccountId();
+        String operation = request.getOperation().toUpperCase();
 
         if (srcId == null) {
             throw new AccountNotFoundException("Source account ID cannot be null.");
         }
-        if (tgtId != null && srcId.equals(tgtId)) {
-            throw new CurrencyMismatchException("Source and target accounts must be distinct.");
+        if (tgtId != null) {
+            if (srcId.equals(tgtId)) {
+                throw new InvalidTransferException("Source and target accounts must be different.");
+            }
+            if (!"DEBIT".equals(operation)) {
+                throw new InvalidTransferException(
+                    "Transfers must use operation DEBIT (debit source, credit target). " +
+                    "A CREDIT cannot include a targetAccountId.");
+            }
         }
 
         // 2. Deadlock-free Ordered Pessimistic Locking
@@ -115,7 +125,6 @@ public class LedgerMutationService {
         BigDecimal beforeBalance = srcAccount.getCurrentBalance();
         BigDecimal mutationAmount = request.getMutationAmount();
         BigDecimal afterBalance;
-        String operation = request.getOperation() != null ? request.getOperation().toUpperCase() : "DEBIT";
 
         List<LedgerLegEntry> legEntries = new ArrayList<>();
 
@@ -160,6 +169,7 @@ public class LedgerMutationService {
                 "SUCCESS",
                 null
         );
+        txRecord.setOperation(operation); 
         txRecord = transactionRepository.save(txRecord);
 
         // 6. Synchronously Insert AUDIT_LOG in Oracle XE
@@ -221,11 +231,11 @@ public class LedgerMutationService {
                     }
 
                     @Override
-                    public void afterCompletion(int status) {
-                        if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-                            idempotencyService.release(idempotencyKey);
-                        }
-                    }
+public void afterCompletion(int status) {
+    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+        idempotencyService.releaseIfInProgress(idempotencyKey);
+    }
+}
                 });
             } else {
                 idempotencyService.complete(idempotencyKey, response);
