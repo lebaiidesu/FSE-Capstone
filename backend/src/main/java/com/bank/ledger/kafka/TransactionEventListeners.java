@@ -79,7 +79,7 @@ public class TransactionEventListeners {
             Long accountId = node.has("accountId") ? node.get("accountId").asLong() : 1L;
             String operation = node.has("operation") ? node.get("operation").asText() : "DEBIT";
             BigDecimal amount = node.has("amount") ? new BigDecimal(node.get("amount").asText()) : BigDecimal.ZERO;
-            String refNo = node.has("referenceNo") ? node.get("referenceNo").asText() : "TX-REF";
+            String refNo = node.path("referenceNo").asText(null); 
 
             notificationConsumerService.consumeNotificationEvent(customerId, accountId, operation, amount, refNo);
         } catch (Exception ex) {

@@ -96,4 +96,17 @@ public class IdempotencyHandlerInterceptor implements HandlerInterceptor {
         response.getWriter().write(objectMapper.writeValueAsString(problem));
         response.getWriter().flush();
     }
+
+        @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
+                                Object handler, Exception ex) {
+        // Success: afterCommit() already stored the response; keep it
+        if (ex == null && response.getStatus() < 400) {
+            return;
+        }
+        String key = request.getHeader("Idempotency-Key");
+        if (key != null && !key.isBlank()) {
+            idempotencyService.releaseIfInProgress(key);
+        }
+    }
 }

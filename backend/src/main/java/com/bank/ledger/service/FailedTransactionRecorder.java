@@ -48,6 +48,7 @@ public class FailedTransactionRecorder {
                     ex.getReasonCode()
             );
 
+            failedRecord.setOperation("CREDIT".equalsIgnoreCase(request.getOperation()) ? "CREDIT" : "DEBIT");
             TransactionRecord saved = transactionRepository.save(failedRecord);
             log.warn("Recorded FAILED transaction: ref={}, fromAccount={}, reason={}", 
                     referenceNo, fromAccountId, ex.getReasonCode());

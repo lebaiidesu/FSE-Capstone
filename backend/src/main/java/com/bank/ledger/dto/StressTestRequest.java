@@ -1,7 +1,6 @@
 package com.bank.ledger.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 public class StressTestRequest {
     private Long accountId;

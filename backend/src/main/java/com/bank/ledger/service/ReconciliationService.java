@@ -85,10 +85,11 @@ public class ReconciliationService {
     }
 
     private void reconcileTransactionLegs(TransactionRecord tx, List<LedgerMutationAudit> audits) {
-        // Reconcile Source Leg
-        reconcileLeg(tx, tx.getFromAccountId(), "DEBIT", audits);
+        // Source leg follows the operation: DEBIT for debits and transfers, CREDIT for deposits
+        String sourceEntryType = "CREDIT".equalsIgnoreCase(tx.getOperation()) ? "CREDIT" : "DEBIT";
+        reconcileLeg(tx, tx.getFromAccountId(), sourceEntryType, audits);
 
-        // If internal transfer with target account, reconcile Target Leg
+        // Internal transfer: target leg is always a CREDIT
         if (tx.getToAccountId() != null) {
             reconcileLeg(tx, tx.getToAccountId(), "CREDIT", audits);
         }
@@ -111,6 +112,9 @@ public class ReconciliationService {
             }
             if (audit.getEntryType() != null && !audit.getEntryType().equalsIgnoreCase(expectedEntryType)) {
                 mismatches.add("ENTRY_TYPE_MISMATCH");
+            }
+            if (audit.getCurrency() != null && !audit.getCurrency().equalsIgnoreCase(tx.getSourceCurrency())) {
+                mismatches.add("CURRENCY_MISMATCH");
             }
             if (mismatches.isEmpty()) {
                 postgresStatus = "COMMITTED";

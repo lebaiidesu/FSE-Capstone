@@ -40,10 +40,12 @@ CREATE TABLE RECONCILIATION_LOG (
 CREATE TABLE NOTIFICATION (
     notification_id  BIGSERIAL PRIMARY KEY,
     customer_id      BIGINT NOT NULL,
-    reference_no     VARCHAR(64),
+    reference_no     VARCHAR(64) NOT NULL,
     message          TEXT NOT NULL,
-    status           VARCHAR(20) NOT NULL CHECK (status IN ('SENT', 'FAILED', 'RETRY')),
-    created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+    status           VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'SENT', 'FAILED', 'RETRY')),
+    created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_date     TIMESTAMPTZ,
+    CONSTRAINT uq_notification_ref UNIQUE (reference_no)
 );
 
 -- Performance & Query Optimization Indexes

@@ -28,3 +28,6 @@ Desktop.ini
 *.tmp
 oracle_data/
 postgres_data/
+
+
+.env

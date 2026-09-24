@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 
 public class MutationRequest {
@@ -17,7 +18,8 @@ public class MutationRequest {
     private BigDecimal mutationAmount;
 
     @NotBlank(message = "Mutation operation is mandatory ('DEBIT' or 'CREDIT')")
-    private String operation; // 'DEBIT', 'CREDIT'
+    @Pattern(regexp = "(?i)DEBIT|CREDIT", message = "Operation must be 'DEBIT' or 'CREDIT'")
+    private String operation;
 
     private String transactionType = "DEBIT"; // 'DEBIT', 'CREDIT', 'TRANSFER_INSTAPAY', 'TRANSFER_PESONET', 'TRANSFER_QRPH'
 
@@ -58,4 +60,6 @@ public class MutationRequest {
 
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+
+    
 }
