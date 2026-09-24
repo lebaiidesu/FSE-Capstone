@@ -1,0 +1,59 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: ["GET","POST","PUT","DELETE","OPTIONS","PATCH"]
+            allowedHeaders: "*"
+            allowCredentials: true
+            exposedHeaders: ["Authorization","Idempotency-Key"]
+      routes:
+        # Auth Service
+        - id: auth-service
+          uri: http://${AUTH_SERVICE_HOST:auth-service}:8081
+          predicates:
+            - Path=/api/v1/auth/**
+
+        # Account Service
+        - id: account-service
+          uri: http://${ACCOUNT_SERVICE_HOST:account-service}:8082
+          predicates:
+            - Path=/api/v1/accounts/**
+
+        # Transaction Service
+        - id: transaction-service
+          uri: http://${TRANSACTION_SERVICE_HOST:transaction-service}:8083
+          predicates:
+            - Path=/api/v1/ledger/**,/api/v1/stress/**
+
+        # Reconciliation Service
+        - id: reconciliation-service
+          uri: http://${RECONCILIATION_SERVICE_HOST:reconciliation-service}:8086
+          predicates:
+            - Path=/api/v1/reconciliation/**
+
+        # Telemetry (transaction-service also exposes telemetry)
+        - id: telemetry
+          uri: http://${TRANSACTION_SERVICE_HOST:transaction-service}:8083
+          predicates:
+            - Path=/api/v1/telemetry/**
+
+app:
+  security:
+    jwt-secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
