@@ -1,0 +1,4 @@
+com\bank\outbox\service\OutboxPublisherService.class
+com\bank\outbox\OutboxPublisherApplication.class
+com\bank\outbox\model\OutboxEvent.class
+com\bank\outbox\repository\OutboxEventRepository.class

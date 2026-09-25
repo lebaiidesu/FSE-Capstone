@@ -1,0 +1,6 @@
+com\bank\common\dto\MutationRequest.class
+com\bank\common\exception\ProblemDetails.class
+com\bank\common\dto\LoginResponse.class
+com\bank\common\dto\LoginRequest.class
+com\bank\common\dto\MutationResponse.class
+com\bank\common\event\OutboxEventPayload.class

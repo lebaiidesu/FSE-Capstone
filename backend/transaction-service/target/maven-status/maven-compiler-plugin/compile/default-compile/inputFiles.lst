@@ -1,0 +1,12 @@
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\controller\TransactionController.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\model\TransactionRecord.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\repository\OutboxEventRepository.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\exception\GlobalExceptionHandler.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\model\AuditLog.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\repository\AuditLogRepository.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\service\LedgerMutationService.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\TransactionServiceApplication.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\model\Account.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\repository\TransactionRepository.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\repository\AccountRepository.java
+C:\Users\FTM83759\Downloads\comparing\FSE-Capstone-Unified\backend\transaction-service\src\main\java\com\bank\transaction\model\OutboxEvent.java

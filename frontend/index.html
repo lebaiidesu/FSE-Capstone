@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayPink | Core Retail Ledger & Balance Mutation Engine</title>
+    <meta name="description" content="High-Throughput Relational Balance Mutation, Distributed In-Memory Validation, Transactional Outbox Kafka Streaming, and PostgreSQL Immutable Audit Trail.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/css/style.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app-container" class="app-layout">
+        <!-- Top Navigation Bar -->
+        <header id="main-header" class="top-nav">
+            <div class="nav-brand">
+                <div class="brand-logo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="14" fill="url(#pink-grad)" />
+                        <path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <defs>
+                            <linearGradient id="pink-grad" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#E11D48"/>
+                                <stop offset="1" stop-color="#BE185D"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">PayPink</span>
+                    <span class="brand-subtitle">Core Retail Ledger &bull; FSE Capstone Engine</span>
+                </div>
+            </div>
+
+            <!-- System Architecture Health Badges -->
+            <div class="system-pills">
+                <div class="pill pill-oracle" id="pill-oracle-status" title="Master Source of Truth (ACID Isolated)">
+                    <span class="status-dot online"></span>
+                    <span>Oracle XE: <strong>PESSIMISTIC_WRITE</strong></span>
+                </div>
+                <div class="pill pill-postgres" id="pill-postgres-status" title="Immutable Audit Store (Append-Only)">
+                    <span class="status-dot online"></span>
+                    <span>PostgreSQL: <strong>IMMUTABLE AUDIT</strong></span>
+                </div>
+                <div class="pill pill-kafka" id="pill-kafka-status" title="Transactional Outbox Event Streaming">
+                    <span class="status-dot online"></span>
+                    <span>Kafka: <strong>OUTBOX STREAM</strong></span>
+                </div>
+                <div class="pill pill-redis" id="pill-redis-status" title="In-Memory Validation Matrix">
+                    <span class="status-dot online"></span>
+                    <span>Redis: <strong>&le;5ms IDEMP</strong></span>
+                </div>
+            </div>
+
+            <!-- User Profile & Token Modal Trigger -->
+            <div class="user-profile-widget">
+                <button id="btn-jwt-info" class="btn-token-badge" title="Inspect Stateless JWT Claims">
+                    <span class="badge-icon">🔐</span>
+                    <span class="badge-text">JWT: ROLE_CUSTOMER</span>
+                </button>
+                <div class="user-avatar-block">
+                    <div class="avatar-circle">JD</div>
+                    <div class="user-meta">
+                        <div class="user-name">Juan Dela Cruz</div>
+                        <div class="user-branch">BGC Taguig Branch</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main id="main-content" class="main-body">
+            <!-- Navigation Tabs -->
+            <nav id="app-tabs" class="tab-bar">
+                <button id="tab-btn-dashboard" class="tab-item active" onclick="switchTab('dashboard')">
+                    <span class="tab-icon">💳</span>
+                    <span>Retail Banking &amp; Transfers</span>
+                </button>
+                <button id="tab-btn-concurrency" class="tab-item" onclick="switchTab('concurrency')">
+                    <span class="tab-icon">⚡</span>
+                    <span>Double-Spend Concurrency Tester</span>
+                </button>
+                <button id="tab-btn-lifecycle" class="tab-item" onclick="switchTab('lifecycle')">
+                    <span class="tab-icon">🔄</span>
+                    <span>11-Step Event Lifecycle Visualizer</span>
+                </button>
+                <button id="tab-btn-mutation" class="tab-item" onclick="switchTab('mutation')">
+                    <span class="tab-icon">🛡️</span>
+                    <span>JSR-380 &amp; RFC-7807 Inspector</span>
+                </button>
+                <button id="tab-btn-reconciliation" class="tab-item" onclick="switchTab('reconciliation')">
+                    <span class="tab-icon">⚖️</span>
+                    <span>@Scheduled Reconciliation</span>
+                </button>
+                <button id="tab-btn-telemetry" class="tab-item" onclick="switchTab('telemetry')">
+                    <span class="tab-icon">📊</span>
+                    <span>Telemetry &amp; Observability</span>
+                </button>
+            </nav>
+
+            <!-- TAB 1: RETAIL BANKING & TRANSFERS -->
+            <section id="tab-dashboard" class="tab-panel active">
+                <div class="dashboard-grid">
+                    <!-- Left Column: Accounts & Quick Action -->
+                    <div class="dashboard-left">
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h2 class="card-title">My Accounts (customer_balance_master)</h2>
+                                <span class="badge-chip">Oracle XE 21c</span>
+                            </div>
+                            <div class="accounts-carousel" id="accounts-container">
+                                <!-- Dynamic Account Cards injected by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Transfer / Mutation Panel -->
+                        <div class="section-card transfer-card">
+                            <div class="card-header">
+                                <h2 class="card-title">Initiate Transfer / Ledger Mutation</h2>
+                                <div class="rails-badges">
+                                    <span class="rail-badge active" id="rail-instapay">InstaPay</span>
+                                    <span class="rail-badge" id="rail-pesonet">PESONet</span>
+                                    <span class="rail-badge" id="rail-qrph">QR Ph</span>
+                                </div>
+                            </div>
+                            <form id="form-quick-transfer" class="transfer-form" onsubmit="handleTransferSubmit(event)">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="select-source-account">Source Account</label>
+                                        <select id="select-source-account" class="form-control" required></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="select-target-account">Beneficiary / Target</label>
+                                        <select id="select-target-account" class="form-control">
+                                            <option value="4">Maria Santos (ACC-PH-2002-3311 - Makati CBD)</option>
+                                            <option value="5">Joshua Reyes (ACC-PH-3003-4422 - Ortigas Center)</option>
+                                            <option value="2">My Checking Account (ACC-PH-1001-9921)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="input-transfer-amount">Amount (PHP / ₱ &bull; max 4 decimals)</label>
+                                        <div class="input-currency-wrapper">
+                                            <span class="currency-prefix">₱</span>
+                                            <input type="number" step="0.0001" min="0.0001" id="input-transfer-amount" class="form-control currency-input" placeholder="1,500.0000" required>
+                                        </div>
+                                        <small class="field-hint">Enforces JSR-380 @Digits(integer=14, fraction=4) and @Positive</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="input-idempotency-key">Idempotency Key (Redis &le;5ms)</label>
+                                        <div class="input-action-group">
+                                            <input type="text" id="input-idempotency-key" class="form-control code-font" readonly>
+                                            <button type="button" class="btn-secondary" onclick="generateNewIdempotencyKey()" title="Generate Unique Key">🔄</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" id="btn-submit-transfer" class="btn-primary">
+                                        <span>Execute Transfer</span>
+                                        <span class="btn-subtext">ACID Row-Lock &bull; Outbox Stream</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Live Stream Feed & Security Audit -->
+                    <div class="dashboard-right">
+                        <!-- Synchronous Security Audit Logs (Oracle XE) -->
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Security &amp; Operational Audit (Oracle XE)</h3>
+                                <span class="badge-chip pill-oracle">Synchronous Local ACID</span>
+                            </div>
+                            <div class="log-stream-box" id="oracle-audit-logs">
+                                <!-- Dynamically populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Real-time Transactions Feed -->
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Transaction History</h3>
+                                <span class="badge-chip">DD/MM/YYYY</span>
+                            </div>
+                            <div class="transaction-list" id="transaction-feed">
+                                <!-- Dynamically populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: CONCURRENCY & DOUBLE-SPEND TESTER -->
+            <section id="tab-concurrency" class="tab-panel">
+                <div class="concurrency-dashboard">
+                    <div class="panel-hero">
+                        <div class="hero-tag">Requirement 1.B: Concurrency Control &amp; Row Isolation</div>
+                        <h2 class="hero-title">Live Double-Spend Race Condition Simulator</h2>
+                        <p class="hero-desc">
+                            Simulate simultaneous parallel HTTP threads executing <strong>₱50.0000</strong> debits on an account reset to <strong>₱60.0000</strong>.
+                            Observe how <code>@Lock(LockModeType.PESSIMISTIC_WRITE)</code> serializes requests at the database layer (<code>SELECT ... FOR UPDATE</code>), guaranteeing exactly 1 success and 0% balance overdraft.
+                        </p>
+                    </div>
+
+                    <div class="concurrency-grid">
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Simulation Parameters</h3>
+                            </div>
+                            <div class="form-group">
+                                <label>Target Stress Account:</label>
+                                <div class="locked-account-card">
+                                    <div class="acc-badge">ACC-PH-1001-7714</div>
+                                    <div class="acc-bal-label">Current Balance: <span id="stress-acc-current-bal" class="pink-highlight">₱60.0000</span></div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="stress-thread-count">Concurrent Threads:</label>
+                                    <select id="stress-thread-count" class="form-control">
+                                        <option value="10" selected>10 Simultaneous Threads</option>
+                                        <option value="20">20 Simultaneous Threads</option>
+                                        <option value="50">50 Simultaneous Threads (Stress Velocity)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="stress-debit-amount">Debit Per Thread (PHP):</label>
+                                    <input type="text" id="stress-debit-amount" class="form-control currency-input" value="50.0000" readonly>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button id="btn-run-stress-test" class="btn-primary btn-stress" onclick="runStressSimulation()">
+                                    🚀 Launch Concurrent Race Condition Test
+                                </button>
+                                <button class="btn-secondary" onclick="resetStressAccount()">
+                                    ↺ Reset Account to ₱60.0000
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Results & Thread Queue Visualization -->
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Race Condition Protection Outcome</h3>
+                                <span id="stress-status-chip" class="badge-chip">Awaiting Simulation</span>
+                            </div>
+
+                            <div class="stress-metrics-summary" id="stress-metrics-box">
+                                <div class="metric-card">
+                                    <div class="metric-num" id="stress-starting-bal">₱60.0000</div>
+                                    <div class="metric-lbl">Starting Balance</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-num pink-highlight" id="stress-final-bal">₱60.0000</div>
+                                    <div class="metric-lbl">Final Balance</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-num green-highlight" id="stress-success-count">0</div>
+                                    <div class="metric-lbl">Committed (1 Expected)</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-num red-highlight" id="stress-rejected-count">0</div>
+                                    <div class="metric-lbl">Blocked / Rejected</div>
+                                </div>
+                            </div>
+
+                            <div class="thread-logs-container">
+                                <h4>Thread Execution Trace (Database Row Queueing):</h4>
+                                <div class="thread-logs-list" id="thread-logs-list">
+                                    <div class="empty-state">Click "Launch Concurrent Race Condition Test" to trigger simultaneous thread execution.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: 11-STEP EVENT LIFECYCLE VISUALIZER -->
+            <section id="tab-lifecycle" class="tab-panel">
+                <div class="section-card">
+                    <div class="card-header">
+                        <h2 class="card-title">11-Step Event Lifecycle &amp; Outbox Streaming Pipeline</h2>
+                        <span class="badge-chip">Asynchronous Decoupled Topology</span>
+                    </div>
+                    <p class="section-subtitle">
+                        Trace every balance mutation through perimeter validation, in-memory caching, Oracle XE ACID row locking, Transactional Outbox publishing, Kafka event streaming, and PostgreSQL immutable audit logging.
+                    </p>
+
+                    <!-- Interactive Lifecycle Stepper -->
+                    <div class="lifecycle-container" id="lifecycle-stepper">
+                        <div class="lifecycle-step" id="step-1">
+                            <div class="step-badge">1</div>
+                            <div class="step-title">Client Submit</div>
+                            <div class="step-desc">JWT + Idempotency Header</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-2">
+                            <div class="step-badge">2</div>
+                            <div class="step-title">JSR-380 Guard</div>
+                            <div class="step-desc">@Digits(14,4) &amp; @Positive</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-3">
+                            <div class="step-badge">3</div>
+                            <div class="step-title">Redis Matrix</div>
+                            <div class="step-desc">Deduplication (&le;5ms)</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-4">
+                            <div class="step-badge">4</div>
+                            <div class="step-title">Oracle ACID Lock</div>
+                            <div class="step-desc">@Lock(PESSIMISTIC_WRITE)</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-5">
+                            <div class="step-badge">5</div>
+                            <div class="step-title">Local Commit</div>
+                            <div class="step-desc">ACCOUNT + OUTBOX_EVENT</div>
+                        </div>
+                    </div>
+
+                    <div class="lifecycle-container secondary-row" id="lifecycle-stepper-2">
+                        <div class="lifecycle-step" id="step-6">
+                            <div class="step-badge">6</div>
+                            <div class="step-title">Outbox Read</div>
+                            <div class="step-desc">CDC / Poller grabs PENDING</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-7">
+                            <div class="step-badge">7</div>
+                            <div class="step-title">Publish Kafka</div>
+                            <div class="step-desc">Topic: transaction-events</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-8">
+                            <div class="step-badge">8</div>
+                            <div class="step-title">Kafka Consumers</div>
+                            <div class="step-desc">Concurrent worker groups</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-9">
+                            <div class="step-badge">9</div>
+                            <div class="step-title">Postgres Audit</div>
+                            <div class="step-desc">LEDGER_MUTATION_AUDIT</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-10">
+                            <div class="step-badge">10</div>
+                            <div class="step-title">Reconciliation</div>
+                            <div class="step-desc">@Scheduled sweep / Realtime</div>
+                        </div>
+                        <div class="lifecycle-arrow">&rarr;</div>
+                        <div class="lifecycle-step" id="step-11">
+                            <div class="step-badge">11</div>
+                            <div class="step-title">Alert Dispatch</div>
+                            <div class="step-desc">SMS/Email &rarr; SENT status</div>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-live-feed">
+                        <div class="feed-column">
+                            <h3>Oracle XE Outbox Records (OUTBOX_EVENT)</h3>
+                            <div class="outbox-table-wrap" id="outbox-events-table">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <div class="feed-column">
+                            <h3>PostgreSQL Immutable Audit Trail (LEDGER_MUTATION_AUDIT)</h3>
+                            <div class="audit-table-wrap" id="postgres-audit-table">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: JSR-380 & RFC-7807 PROBLEM DETAILS INSPECTOR -->
+            <section id="tab-mutation" class="tab-panel">
+                <div class="section-card">
+                    <div class="card-header">
+                        <h2 class="card-title">JSR-380 Perimeter Validation &amp; RFC-7807 Problem Details Inspector</h2>
+                        <span class="badge-chip">Requirement 1.A</span>
+                    </div>
+                    <p class="section-subtitle">
+                        Trigger specific boundary test scenarios against <code>/api/v1/ledger/mutate</code> to inspect RFC-7807 compliant Problem Details error responses and invalid parameter fault arrays.
+                    </p>
+
+                    <div class="problem-details-grid">
+                        <div class="scenario-buttons">
+                            <button class="scenario-btn active" onclick="testScenario('valid')">
+                                <span class="scenario-icon">✅</span>
+                                <span class="scenario-title">Valid Payload</span>
+                                <span class="scenario-desc">₱250.5000 DEBIT (Valid 4 Decimals)</span>
+                            </button>
+                            <button class="scenario-btn" onclick="testScenario('fraction')">
+                                <span class="scenario-icon">❌</span>
+                                <span class="scenario-title">Invalid Decimals (5 Fractions)</span>
+                                <span class="scenario-desc">₱250.12345 (Violates @Digits fraction=4)</span>
+                            </button>
+                            <button class="scenario-btn" onclick="testScenario('negative')">
+                                <span class="scenario-icon">❌</span>
+                                <span class="scenario-title">Negative Amount</span>
+                                <span class="scenario-desc">-₱100.0000 (Violates @Positive)</span>
+                            </button>
+                            <button class="scenario-btn" onclick="testScenario('malformed')">
+                                <span class="scenario-icon">⚠️</span>
+                                <span class="scenario-title">Malformed JSON Schema</span>
+                                <span class="scenario-desc">Unparseable String in numeric field</span>
+                            </button>
+                        </div>
+
+                        <div class="scenario-viewer">
+                            <div class="json-box-header">
+                                <span>HTTP Request Payload &amp; Response Inspector</span>
+                                <span id="response-status-badge" class="badge-chip">HTTP 200 OK</span>
+                            </div>
+                            <div class="code-split-view">
+                                <div class="code-pane">
+                                    <div class="pane-label">REQUEST JSON</div>
+                                    <pre id="code-request-json" class="json-code"></pre>
+                                </div>
+                                <div class="code-pane">
+                                    <div class="pane-label">RESPONSE (RFC-7807 Problem Details)</div>
+                                    <pre id="code-response-json" class="json-code"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: @SCHEDULED RECONCILIATION -->
+            <section id="tab-reconciliation" class="tab-panel">
+                <div class="section-card">
+                    <div class="card-header">
+                        <h2 class="card-title">@Scheduled Cross-Database Reconciliation Service</h2>
+                        <button class="btn-primary" onclick="triggerScheduledReconciliation()">
+                            ⚡ Run Scheduled Sweep Now (@Scheduled 15-Min)
+                        </button>
+                    </div>
+                    <p class="section-subtitle">
+                        Cross-compares <strong>Oracle XE TRANSACTION</strong> records against <strong>PostgreSQL LEDGER_MUTATION_AUDIT</strong> entries to detect and flag data drift (<code>MATCHED</code> vs <code>DRIFT_DETECTED</code>).
+                    </p>
+
+                    <div class="recon-table-wrap">
+                        <table class="recon-table" id="table-reconciliation-logs">
+                            <thead>
+                                <tr>
+                                    <th>Recon ID</th>
+                                    <th>Transaction ID</th>
+                                    <th>Oracle XE Status</th>
+                                    <th>PostgreSQL Status</th>
+                                    <th>Recon Status</th>
+                                    <th>Reconciliation Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recon-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: TELEMETRY & OBSERVABILITY -->
+            <section id="tab-telemetry" class="tab-panel">
+                <div class="telemetry-dashboard">
+                    <div class="card-header">
+                        <h2 class="card-title">Telemetry, Metrics &amp; NFR Performance SLAs</h2>
+                        <span class="badge-chip">Prometheus &bull; OpenTelemetry</span>
+                    </div>
+
+                    <!-- SLA Summary Cards -->
+                    <div class="sla-metrics-grid">
+                        <div class="sla-card">
+                            <div class="sla-icon">🚀</div>
+                            <div class="sla-metric" id="metric-tps">&ge;800 TPS</div>
+                            <div class="sla-label">Throughput Target</div>
+                            <div class="sla-badge status-good">SLA Met (Peak Concurrent)</div>
+                        </div>
+
+                        <div class="sla-card">
+                            <div class="sla-icon">⏱️</div>
+                            <div class="sla-metric" id="metric-p95">&le;12.8 ms</div>
+                            <div class="sla-label">P95 Latency (&le;50ms SLA)</div>
+                            <div class="sla-badge status-good">95% &le; 50ms</div>
+                        </div>
+
+                        <div class="sla-card">
+                            <div class="sla-icon">⚡</div>
+                            <div class="sla-metric" id="metric-redis">0.42 ms</div>
+                            <div class="sla-label">Redis In-Memory (&le;5ms SLA)</div>
+                            <div class="sla-badge status-good">Turnaround &le; 5ms</div>
+                        </div>
+
+                        <div class="sla-card">
+                            <div class="sla-icon">🏊</div>
+                            <div class="sla-metric" id="metric-hikari">30 / 5</div>
+                            <div class="sla-label">HikariCP Max / Min-Idle</div>
+                            <div class="sla-badge">Pool Isolated</div>
+                        </div>
+                    </div>
+
+                    <!-- Live Metrics Snapshot -->
+                    <div class="section-card" style="margin-top: 1.5rem;">
+                        <h3 class="card-title">Live Engine Actuator Metrics</h3>
+                        <div class="telemetry-table-wrap">
+                            <table class="recon-table">
+                                <thead>
+                                    <tr>
+                                        <th>Metric Name</th>
+                                        <th>Current Measured Value</th>
+                                        <th>Engineering SLA / Constraint</th>
+                                        <th>Health Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="telemetry-tbody">
+                                    <tr>
+                                        <td><code>ledger_mutations_total</code></td>
+                                        <td id="t-total-mutations">142</td>
+                                        <td>High-Throughput Relational Target</td>
+                                        <td><span class="status-tag tag-success">ACTIVE</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>pessimistic_lock_wait_avg_ms</code></td>
+                                        <td id="t-lock-wait">1.24 ms</td>
+                                        <td>Row-level @Lock isolation</td>
+                                        <td><span class="status-tag tag-success">OPTIMAL</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>idempotency_matrix_turnaround_ms</code></td>
+                                        <td id="t-redis-latency">0.42 ms</td>
+                                        <td>&le; 5.00 ms (Redis In-Memory)</td>
+                                        <td><span class="status-tag tag-success">COMPLIANT</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>kafka_outbox_consumer_lag</code></td>
+                                        <td>0 msgs</td>
+                                        <td>Near-Real-Time Event Propagation</td>
+                                        <td><span class="status-tag tag-success">ZERO LAG</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- JWT Token Inspector Modal -->
+    <div id="modal-jwt" class="modal-backdrop">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Stateless Perimeter JWT Token Claims</h3>
+                <button class="btn-close" onclick="closeModal('modal-jwt')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Decoded claims verified by <code>JwtAuthenticationFilter</code> at the perimeter:</p>
+                <pre class="json-code" id="modal-jwt-claims"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closeModal('modal-jwt')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction Receipt Modal -->
+    <div id="modal-receipt" class="modal-backdrop">
+        <div class="modal-card receipt-card">
+            <div class="receipt-header">
+                <div class="receipt-icon">🎉</div>
+                <h3>Ledger Mutation Successful</h3>
+                <div class="receipt-ref" id="receipt-ref-no">TX-PH-1700000000000</div>
+            </div>
+            <div class="receipt-body" id="receipt-details">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closeModal('modal-receipt')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script src="src/js/app.js"></script>
+</body>
+</html>

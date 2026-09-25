@@ -1,0 +1,4 @@
+com\bank\notification\consumer\NotificationConsumer.class
+com\bank\notification\repository\NotificationRepository.class
+com\bank\notification\model\Notification.class
+com\bank\notification\NotificationServiceApplication.class
