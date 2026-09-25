@@ -11,6 +11,10 @@ import com.bank.transaction.repository.AuditLogRepository;
 import com.bank.transaction.repository.OutboxEventRepository;
 import com.bank.transaction.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -18,14 +22,17 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class LedgerMutationService {
+
+    private static final Logger log = LoggerFactory.getLogger(LedgerMutationService.class);
+    private static final String IDEMPOTENCY_KEY_PREFIX = "idempotency:tx:";
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
@@ -33,33 +40,43 @@ public class LedgerMutationService {
     private final AuditLogRepository auditLogRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
 
-    // Simple in-memory idempotency cache
-    private final Map<String, MutationResponse> idempotencyCache = new ConcurrentHashMap<>();
+    @Value("${app.idempotency.ttl-hours:24}")
+    private long idempotencyTtlHours;
 
     public LedgerMutationService(AccountRepository accountRepository,
                                  TransactionRepository transactionRepository,
                                  OutboxEventRepository outboxEventRepository,
                                  AuditLogRepository auditLogRepository,
                                  KafkaTemplate<String, String> kafkaTemplate,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 StringRedisTemplate redisTemplate) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.auditLogRepository = auditLogRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public MutationResponse mutateBalance(MutationRequest request, String username) {
-        // 1. Idempotency check
+        // 1. Idempotency check — Redis-backed with TTL
         String idempotencyKey = request.getIdempotencyKey();
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            MutationResponse cached = idempotencyCache.get(idempotencyKey);
-            if (cached != null) {
-                cached.setCachedIdempotentResponse(true);
-                return cached;
+            String redisKey = IDEMPOTENCY_KEY_PREFIX + idempotencyKey;
+            String cachedJson = redisTemplate.opsForValue().get(redisKey);
+            if (cachedJson != null) {
+                try {
+                    MutationResponse cached = objectMapper.readValue(cachedJson, MutationResponse.class);
+                    cached.setCachedIdempotentResponse(true);
+                    log.info("[transaction-service] Idempotent hit for key={}", idempotencyKey);
+                    return cached;
+                } catch (Exception e) {
+                    log.warn("[transaction-service] Failed to deserialize cached idempotency response for key={}: {}", idempotencyKey, e.getMessage());
+                }
             }
         }
 
@@ -143,9 +160,16 @@ public class LedgerMutationService {
                 account.getAccountNumber(), operation, amount,
                 account.getCurrency(), beforeBalance, afterBalance, "SUCCESS", false);
 
-        // 10. Cache idempotency key
+        // 10. Cache idempotency key in Redis with TTL
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            idempotencyCache.put(idempotencyKey, response);
+            try {
+                String redisKey = IDEMPOTENCY_KEY_PREFIX + idempotencyKey;
+                String responseJson = objectMapper.writeValueAsString(response);
+                redisTemplate.opsForValue().set(redisKey, responseJson, Duration.ofHours(idempotencyTtlHours));
+                log.info("[transaction-service] Idempotency key cached in Redis: key={} ttl={}h", idempotencyKey, idempotencyTtlHours);
+            } catch (Exception e) {
+                log.warn("[transaction-service] Failed to cache idempotency key in Redis: {}", e.getMessage());
+            }
         }
 
         // 11. Publish outbox event to Kafka immediately (best-effort)

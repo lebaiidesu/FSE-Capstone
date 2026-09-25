@@ -27,7 +27,9 @@ public class PostgresDataSourceConfig {
     @Bean(name = "postgresDataSource")
     @ConfigurationProperties(prefix = "spring.datasource.postgres")
     public DataSource postgresDataSource() {
-        return DataSourceBuilder.create().build();
+        return DataSourceBuilder.create()
+                .type(com.zaxxer.hikari.HikariDataSource.class)
+                .build();
     }
 
     @Bean(name = "postgresEntityManagerFactory")

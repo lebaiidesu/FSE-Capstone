@@ -23,6 +23,11 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
       timeout: 5000ms
+      connect-timeout: 3000ms
+
+app:
+  idempotency:
+    ttl-hours: ${IDEMPOTENCY_TTL_HOURS:24}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
