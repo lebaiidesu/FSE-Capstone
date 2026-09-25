@@ -22,8 +22,9 @@ public class Notification {
     }
 
     public Long getNotificationId() { return notificationId; }
-    public Long getCustomerId() { return customerId; }
-    public String getMessage() { return message; }
-    public String getStatus() { return status; }
+    public Long getCustomerId()     { return customerId; }
+    public String getMessage()      { return message; }
+    public String getStatus()       { return status; }
+    public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedDate() { return createdDate; }
 }

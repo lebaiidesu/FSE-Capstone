@@ -108,10 +108,16 @@ services:
       dockerfile: Dockerfile
     container_name: api-gateway
     depends_on:
-      - auth-service
-      - account-service
-      - transaction-service
-      - reconciliation-service
+      auth-service:
+        condition: service_started
+      account-service:
+        condition: service_started
+      transaction-service:
+        condition: service_started
+      reconciliation-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -120,6 +126,8 @@ services:
       - TRANSACTION_SERVICE_HOST=transaction-service
       - RECONCILIATION_SERVICE_HOST=reconciliation-service
       - ANALYTICS_SERVICE_HOST=analytics-service
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     networks:
       - ledger-net
@@ -304,6 +312,21 @@ services:
   #     - "8099:8080"
   #   networks:
   #     - ledger-net
+
+  # ==========================================
+  # Layer 1: Frontend SPA (Nginx)
+  # ==========================================
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: frontend-spa
+    depends_on:
+      - api-gateway
+    ports:
+      - "3001:80"
+    networks:
+      - ledger-net
 
   # ==========================================
   # Layer 6: Observability & Telemetry
