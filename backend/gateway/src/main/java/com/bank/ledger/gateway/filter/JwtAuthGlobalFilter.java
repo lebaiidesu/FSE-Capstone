@@ -25,7 +25,9 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class JwtAuthGlobalFilter implements WebFilter, Ordered {
@@ -99,7 +101,19 @@ public class JwtAuthGlobalFilter implements WebFilter, Ordered {
                     path);
         }
 
-        // 4. Validate active state in Redis Token Matrix
+        // 4. Role check for admin-only routes (runs BEFORE the Redis lookup).
+        //    event-consumers has no Spring Security of its own, so the gateway is where RBAC is enforced.
+        String requiredRole = requiredRoleFor(path);
+        if (requiredRole != null && !hasRole(claims, requiredRole)) {
+            log.warn("User {} lacks {} for {}", claims.getSubject(), requiredRole, path);
+            return onError(exchange, HttpStatus.FORBIDDEN,
+                    "https://api.paypink.ph/errors/forbidden",
+                    "Forbidden",
+                    "This endpoint requires the " + requiredRole.replace("ROLE_", "") + " role.",
+                    path);
+        }
+
+        // 5. Validate active state in Redis Token Matrix
         return reactiveRedisTemplate.hasKey("token:" + jti)
                 .flatMap(hasKey -> {
                     if (Boolean.TRUE.equals(hasKey)) {
@@ -123,6 +137,25 @@ public class JwtAuthGlobalFilter implements WebFilter, Ordered {
                     log.error("Redis token check failed: {}, proceeding with cryptographic signature verification", e.getMessage());
                     return chain.filter(exchange);
                 });
+    }
+
+    /** Admin-only path prefixes -> required role. Add more routes here as services grow. */
+    private static final Map<String, String> ROLE_RULES = Map.of(
+            "/api/v1/reconciliation", "ROLE_ADMIN"
+    );
+
+    private String requiredRoleFor(String path) {
+        return ROLE_RULES.entrySet().stream()
+                .filter(rule -> path.startsWith(rule.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Reads the "roles" claim written by ledger-core's JwtTokenProvider (e.g. ["ROLE_ADMIN","ROLE_CUSTOMER"]). */
+    private boolean hasRole(Claims claims, String role) {
+        Object roles = claims.get("roles");
+        return roles instanceof Collection<?> list && list.contains(role);
     }
 
     private boolean isPublicPath(String path) {

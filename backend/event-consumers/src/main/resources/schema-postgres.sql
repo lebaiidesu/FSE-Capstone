@@ -1,13 +1,18 @@
 -- ============================================================================
 -- CAPSTONE FSE: Core Retail Ledger & Balance Mutation Engine
--- PostgreSQL 15+ Database Schema (Immutable Audit & Downstream Store)
+-- PostgreSQL 15+ schema OWNED BY event-consumers
+--   LEDGER_MUTATION_AUDIT  (immutable financial audit, one row per ledger leg)
+--   RECONCILIATION_LOG     (Oracle vs PostgreSQL drift detection, upserted per leg)
+--
+-- NOTIFICATION is owned by notification-service (see its own schema-postgres.sql).
+-- Oracle tables are owned by ledger-core (schema-oracle.sql); this service only READS them.
+-- No seed rows: audit and reconciliation data only ever come from real Kafka events.
 -- ============================================================================
 
-DROP TABLE IF EXISTS NOTIFICATION CASCADE;
 DROP TABLE IF EXISTS RECONCILIATION_LOG CASCADE;
 DROP TABLE IF EXISTS LEDGER_MUTATION_AUDIT CASCADE;
 
--- 1. LEDGER_MUTATION_AUDIT TABLE (Immutable Append-Only Financial Audit Trail)
+-- 1. LEDGER_MUTATION_AUDIT (Immutable Append-Only Financial Audit Trail)
 CREATE TABLE LEDGER_MUTATION_AUDIT (
     audit_id         BIGSERIAL PRIMARY KEY,
     transaction_id   BIGINT NOT NULL,
@@ -21,14 +26,14 @@ CREATE TABLE LEDGER_MUTATION_AUDIT (
     CONSTRAINT uq_audit_tx_account UNIQUE (transaction_id, account_id)
 );
 
--- 2. RECONCILIATION_LOG TABLE (Cross-Database Integrity & Drift Detection)
+-- 2. RECONCILIATION_LOG (Cross-Database Integrity & Drift Detection)
 CREATE TABLE RECONCILIATION_LOG (
     recon_id         BIGSERIAL PRIMARY KEY,
     transaction_id   BIGINT NOT NULL,
     account_id       BIGINT NOT NULL,
     oracle_status    VARCHAR(30) NOT NULL,
     postgres_status  VARCHAR(30) NOT NULL,
-    recon_status     VARCHAR(30) NOT NULL, -- 'MATCHED', 'DRIFT_DETECTED'
+    recon_status     VARCHAR(30) NOT NULL,          -- 'MATCHED', 'DRIFT_DETECTED'
     mismatch_fields  VARCHAR(200),
     check_count      INT DEFAULT 1 NOT NULL,
     last_checked_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -36,31 +41,8 @@ CREATE TABLE RECONCILIATION_LOG (
     CONSTRAINT uq_recon_tx_account UNIQUE (transaction_id, account_id)
 );
 
--- 3. NOTIFICATION TABLE (Customer Alert Dispatch History)
-CREATE TABLE NOTIFICATION (
-    notification_id  BIGSERIAL PRIMARY KEY,
-    customer_id      BIGINT NOT NULL,
-    reference_no     VARCHAR(64) NOT NULL,
-    message          TEXT NOT NULL,
-    status           VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'SENT', 'FAILED', 'RETRY')),
-    created_date     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_date     TIMESTAMPTZ,
-    CONSTRAINT uq_notification_ref UNIQUE (reference_no)
-);
-
--- Performance & Query Optimization Indexes
-CREATE INDEX idx_audit_tx_id ON LEDGER_MUTATION_AUDIT(transaction_id);
-CREATE INDEX idx_audit_acc_id ON LEDGER_MUTATION_AUDIT(account_id);
+-- Indexes
+CREATE INDEX idx_audit_tx_id   ON LEDGER_MUTATION_AUDIT(transaction_id);
+CREATE INDEX idx_audit_acc_id  ON LEDGER_MUTATION_AUDIT(account_id);
 CREATE INDEX idx_audit_created ON LEDGER_MUTATION_AUDIT(created_date);
-CREATE INDEX idx_recon_status ON RECONCILIATION_LOG(recon_status, recon_date);
-CREATE INDEX idx_notif_cust_status ON NOTIFICATION(customer_id, status);
-
--- Seed Initial Mock Audit Records
-INSERT INTO LEDGER_MUTATION_AUDIT (transaction_id, account_id, operation, amount, currency, before_balance, after_balance)
-VALUES (101, 1, 'CREDIT', 25000.0000, 'PHP', 100450.0000, 125450.0000);
-
-INSERT INTO RECONCILIATION_LOG (transaction_id, oracle_status, postgres_status, recon_status)
-VALUES (101, 'SUCCESS', 'COMMITTED', 'MATCHED');
-
-INSERT INTO NOTIFICATION (customer_id, message, status)
-VALUES (1, 'PayPink Alert: ₱25,000.0000 credited to Account ACC-PH-1001-8842 via InstaPay.', 'SENT');
+CREATE INDEX idx_recon_status  ON RECONCILIATION_LOG(recon_status, recon_date);

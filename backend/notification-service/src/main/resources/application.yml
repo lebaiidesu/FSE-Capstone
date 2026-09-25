@@ -16,13 +16,20 @@ spring:
   sql:
     init:
       mode: never
+  jackson:
+    deserialization:
+      use-big-decimal-for-floats: true   # money in events is read as exact BigDecimal, never double
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
-      enable-auto-commit: true
+      # enable-auto-commit left at Spring's default (false): offsets are committed only after processing.
+    producer:   # used only by the DeadLetterPublishingRecoverer (-> transaction-events.DLT)
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
 
 management:
   endpoints:

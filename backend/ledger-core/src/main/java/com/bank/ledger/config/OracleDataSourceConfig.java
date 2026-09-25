@@ -37,7 +37,8 @@ public class OracleDataSourceConfig {
 
     @Primary
     @Bean(name = "oracleDataSource")
-    public DataSource oracleDataSource() {
+    @ConfigurationProperties("app.datasource.oracle.hikari")   // applies pool size 30 / min idle 10 from application.yml
+    public HikariDataSource oracleDataSource() {
         DataSourceProperties props = oracleDataSourceProperties();
         if (props.getUrl() == null || props.getUrl().isBlank()) {
             HikariDataSource ds = new HikariDataSource();

@@ -2,10 +2,13 @@ package com.bank.ledger.service;
 
 import com.bank.ledger.dto.MutationRequest;
 import com.bank.ledger.dto.MutationResponse;
+import com.bank.ledger.dto.TransactionOutboxPayload;
+import com.bank.ledger.dto.TransactionOutboxPayload.EntryPayload;
 import com.bank.ledger.exception.AccountNotFoundException;
 import com.bank.ledger.exception.CurrencyMismatchException;
 import com.bank.ledger.exception.InsufficientFundsException;
 import com.bank.ledger.exception.InvalidTransferException;
+import com.bank.ledger.exception.LedgerPersistenceException;
 import com.bank.ledger.model.oracle.Account;
 import com.bank.ledger.model.oracle.AuditLog;
 import com.bank.ledger.model.oracle.OutboxEvent;
@@ -22,10 +25,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import com.bank.ledger.exception.InvalidTransferException;
+
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -73,7 +75,7 @@ public class LedgerMutationService {
         long startTimeNanos = System.nanoTime();
         final String idempotencyKey = request.getIdempotencyKey();
 
-                // 1. Request-shape validation (no locks held yet)
+        // 1. Request-shape validation (no locks held yet)
         Long srcId = request.getAccountId();
         Long tgtId = request.getTargetAccountId();
         String operation = request.getOperation().toUpperCase();
@@ -126,7 +128,7 @@ public class LedgerMutationService {
         BigDecimal mutationAmount = request.getMutationAmount();
         BigDecimal afterBalance;
 
-        List<LedgerLegEntry> legEntries = new ArrayList<>();
+        List<EntryPayload> legEntries = new ArrayList<>();
 
         // 4. Overdraft Prevention & State Mutation
         if ("DEBIT".equals(operation)) {
@@ -137,7 +139,7 @@ public class LedgerMutationService {
             srcAccount.setCurrentBalance(afterBalance);
             accountRepository.save(srcAccount);
 
-            legEntries.add(new LedgerLegEntry(srcAccount.getAccountId(), "DEBIT", mutationAmount, srcAccount.getCurrency(), beforeBalance, afterBalance));
+            legEntries.add(new EntryPayload(srcAccount.getAccountId(), srcAccount.getCustomerId(), "DEBIT", mutationAmount, srcAccount.getCurrency(), beforeBalance, afterBalance));
 
             // If internal transfer, credit target account
             if (tgtAccount != null) {
@@ -145,13 +147,13 @@ public class LedgerMutationService {
                 BigDecimal tgtAfter = tgtBefore.add(mutationAmount);
                 tgtAccount.setCurrentBalance(tgtAfter);
                 accountRepository.save(tgtAccount);
-                legEntries.add(new LedgerLegEntry(tgtAccount.getAccountId(), "CREDIT", mutationAmount, tgtAccount.getCurrency(), tgtBefore, tgtAfter));
+                legEntries.add(new EntryPayload(tgtAccount.getAccountId(), tgtAccount.getCustomerId(), "CREDIT", mutationAmount, tgtAccount.getCurrency(), tgtBefore, tgtAfter));
             }
         } else if ("CREDIT".equals(operation)) {
             afterBalance = beforeBalance.add(mutationAmount);
             srcAccount.setCurrentBalance(afterBalance);
             accountRepository.save(srcAccount);
-            legEntries.add(new LedgerLegEntry(srcAccount.getAccountId(), "CREDIT", mutationAmount, srcAccount.getCurrency(), beforeBalance, afterBalance));
+            legEntries.add(new EntryPayload(srcAccount.getAccountId(), srcAccount.getCustomerId(), "CREDIT", mutationAmount, srcAccount.getCurrency(), beforeBalance, afterBalance));
         } else {
             throw new IllegalArgumentException("Unsupported mutation operation: " + operation);
         }
@@ -169,7 +171,7 @@ public class LedgerMutationService {
                 "SUCCESS",
                 null
         );
-        txRecord.setOperation(operation); 
+        txRecord.setOperation(operation);
         txRecord = transactionRepository.save(txRecord);
 
         // 6. Synchronously Insert AUDIT_LOG in Oracle XE
@@ -183,24 +185,27 @@ public class LedgerMutationService {
         );
         auditLogRepository.save(auditLog);
 
-        // 7. Insert OUTBOX_EVENT in Oracle XE (Payload with entries[] array)
+        // 7. Insert OUTBOX_EVENT in Oracle XE (shared ledger-common contract with entries[] per leg)
+        TransactionOutboxPayload payload = new TransactionOutboxPayload(
+                txRecord.getTransactionId(),
+                referenceNo,
+                srcAccount.getCustomerId(),
+                srcAccount.getAccountId(),
+                operation,
+                txRecord.getTransactionType(),
+                mutationAmount,
+                srcAccount.getCurrency(),
+                beforeBalance,
+                afterBalance,
+                "SUCCESS",
+                legEntries
+        );
         String payloadJson;
         try {
-            OutboxPayload payload = new OutboxPayload(
-                    txRecord.getTransactionId(),
-                    referenceNo,
-                    srcAccount.getAccountId(),
-                    srcAccount.getCustomerId(),
-                    operation,
-                    mutationAmount,
-                    srcAccount.getCurrency(),
-                    legEntries,
-                    LocalDateTime.now().toString()
-            );
             payloadJson = objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
-            payloadJson = String.format("{\"transactionId\":%d,\"referenceNo\":\"%s\",\"amount\":\"%s\"}",
-                    txRecord.getTransactionId(), referenceNo, mutationAmount.toPlainString());
+            // Never publish a partial event: roll back the whole mutation instead (-> 503 RFC-7807)
+            throw new LedgerPersistenceException("Failed to serialize outbox payload for " + referenceNo, ex);
         }
 
         OutboxEvent outboxEvent = new OutboxEvent(txRecord.getTransactionId(), "TRANSACTION_SUCCESS", payloadJson);
@@ -231,11 +236,11 @@ public class LedgerMutationService {
                     }
 
                     @Override
-public void afterCompletion(int status) {
-    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-        idempotencyService.releaseIfInProgress(idempotencyKey);
-    }
-}
+                    public void afterCompletion(int status) {
+                        if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                            idempotencyService.releaseIfInProgress(idempotencyKey);
+                        }
+                    }
                 });
             } else {
                 idempotencyService.complete(idempotencyKey, response);
@@ -244,54 +249,5 @@ public void afterCompletion(int status) {
 
         telemetryService.recordMutation(false, System.nanoTime() - startTimeNanos);
         return response;
-    }
-
-    public static class LedgerLegEntry {
-        public Long accountId;
-        public String entryType;
-        public BigDecimal amount;
-        public String currency;
-        public BigDecimal beforeBalance;
-        public BigDecimal afterBalance;
-
-        public LedgerLegEntry() {}
-
-        public LedgerLegEntry(Long accountId, String entryType, BigDecimal amount, String currency,
-                              BigDecimal beforeBalance, BigDecimal afterBalance) {
-            this.accountId = accountId;
-            this.entryType = entryType;
-            this.amount = amount;
-            this.currency = currency;
-            this.beforeBalance = beforeBalance;
-            this.afterBalance = afterBalance;
-        }
-    }
-
-    public static class OutboxPayload {
-        public Long transactionId;
-        public String referenceNo;
-        public Long accountId;
-        public Long customerId;
-        public String operation;
-        public BigDecimal amount;
-        public String currency;
-        public List<LedgerLegEntry> entries;
-        public String timestamp;
-
-        public OutboxPayload() {}
-
-        public OutboxPayload(Long transactionId, String referenceNo, Long accountId, Long customerId,
-                             String operation, BigDecimal amount, String currency,
-                             List<LedgerLegEntry> entries, String timestamp) {
-            this.transactionId = transactionId;
-            this.referenceNo = referenceNo;
-            this.accountId = accountId;
-            this.customerId = customerId;
-            this.operation = operation;
-            this.amount = amount;
-            this.currency = currency;
-            this.entries = entries;
-            this.timestamp = timestamp;
-        }
     }
 }

@@ -32,11 +32,12 @@ spring:
           predicates:
             - Path=/api/v1/accounts/**
 
-        # Route 4: Reconciliation Dashboard & Manual Sweeps
+        # Route 4: Reconciliation Dashboard & Manual Sweeps (ADMIN only - enforced in JwtAuthGlobalFilter)
+        #   Must stay ABOVE the catch-all route: routes are matched in list order.
         - id: reconcile-route
           uri: ${EVENT_CONSUMERS_URI:http://localhost:8085}
           predicates:
-            - Path=/api/v1/reconcile/**
+            - Path=/api/v1/reconciliation/**
 
         # Route 5: Catch-all Fallback to Ledger Core
         - id: default-core-route

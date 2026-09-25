@@ -2,7 +2,9 @@ package com.bank.ledger.controller;
 
 import com.bank.ledger.dto.MutationRequest;
 import com.bank.ledger.dto.MutationResponse;
+import com.bank.ledger.security.IdempotencyHandlerInterceptor;
 import com.bank.ledger.service.LedgerMutationFacade;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,15 +24,17 @@ public class LedgerMutationController {
     /**
      * Requirement 1.A: Strictly enforces JSR-380 validation (@Digits(14,4), @Positive).
      * Intercepted by GlobalExceptionHandler on violation.
+     * The Idempotency-Key header is resolved exactly the same way as in IdempotencyHandlerInterceptor.
      */
     @PostMapping("/mutate")
     public ResponseEntity<MutationResponse> mutateLedger(
             @Valid @RequestBody MutationRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
+            HttpServletRequest httpRequest,
             Authentication authentication) {
 
-        if (idempotencyKeyHeader != null && !idempotencyKeyHeader.isBlank()) {
-            request.setIdempotencyKey(idempotencyKeyHeader);
+        String idempotencyKey = IdempotencyHandlerInterceptor.resolveKey(httpRequest);
+        if (idempotencyKey != null) {
+            request.setIdempotencyKey(idempotencyKey);
         }
 
         String username = authentication != null ? authentication.getName() : "jdelacruz";
@@ -38,4 +42,3 @@ public class LedgerMutationController {
         return ResponseEntity.ok(response);
     }
 }
-

@@ -1,20 +1,26 @@
 package com.bank.ledger.kafka;
 
+import com.bank.ledger.event.KafkaTopics;
 import com.bank.ledger.service.NotificationConsumerService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
+import static com.bank.ledger.event.EventFields.required;
+import static com.bank.ledger.event.EventFields.requiredDecimal;
+import static com.bank.ledger.event.EventFields.requiredLong;
+import static com.bank.ledger.event.EventFields.requiredText;
 
+/**
+ * Consumer Group 3 - Customer alerts.
+ * One alert per ledger leg: on an internal transfer the sender gets a DEBIT alert
+ * and the receiver gets a CREDIT alert (each to its own customerId).
+ * No defaults: a missing field throws -> event goes to the DLT.
+ */
 @Component
 public class NotificationEventListener {
-
-    private static final Logger log = LoggerFactory.getLogger(NotificationEventListener.class);
 
     private final NotificationConsumerService notificationConsumerService;
     private final ObjectMapper objectMapper;
@@ -25,23 +31,22 @@ public class NotificationEventListener {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Requirement B5: Consumer Group 3 - Customer Real-Time Alerts & Notification Gateway
-     */
-    @KafkaListener(topics = "transaction-events", groupId = "ledger-notification-group", concurrency = "3")
-    public void onNotificationEvent(ConsumerRecord<String, String> record) {
-        try {
-            JsonNode node = objectMapper.readTree(record.value());
-            Long customerId = node.has("customerId") ? node.get("customerId").asLong() : 1L;
-            Long accountId = node.has("accountId") ? node.get("accountId").asLong() : 1L;
-            String operation = node.has("operation") ? node.get("operation").asText() : "DEBIT";
-            BigDecimal amount = new BigDecimal(node.get("amount").asText());
-            String refNo = node.has("referenceNo") ? node.get("referenceNo").asText() : "TX-REF";
+    @KafkaListener(topics = KafkaTopics.TRANSACTION_EVENTS, groupId = KafkaTopics.NOTIFICATION_GROUP, concurrency = "3")
+    public void onNotificationEvent(ConsumerRecord<String, String> record) throws Exception {
+        JsonNode node = objectMapper.readTree(record.value());
+        String referenceNo = requiredText(node, "referenceNo");
 
-            notificationConsumerService.consumeNotificationEvent(customerId, accountId, operation, amount, refNo);
-        } catch (Exception ex) {
-            log.error("Failed to process notification event: {}", ex.getMessage(), ex);
-            throw new RuntimeException(ex);
+        JsonNode entries = required(node, "entries");
+        if (!entries.isArray() || entries.isEmpty()) {
+            throw new IllegalArgumentException("Event " + referenceNo + " has no ledger entries");
+        }
+        for (JsonNode entry : entries) {
+            notificationConsumerService.consumeNotificationEvent(
+                    requiredLong(entry, "customerId"),
+                    requiredLong(entry, "accountId"),
+                    requiredText(entry, "entryType"),
+                    requiredDecimal(entry, "amount"),
+                    referenceNo);
         }
     }
 }
