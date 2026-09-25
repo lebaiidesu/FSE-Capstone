@@ -119,6 +119,7 @@ services:
       - ACCOUNT_SERVICE_HOST=account-service
       - TRANSACTION_SERVICE_HOST=transaction-service
       - RECONCILIATION_SERVICE_HOST=reconciliation-service
+      - ANALYTICS_SERVICE_HOST=analytics-service
       - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     networks:
       - ledger-net
@@ -195,7 +196,7 @@ services:
       postgresql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8084:8084"
     environment:
@@ -215,7 +216,7 @@ services:
       postgresql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8085:8085"
     environment:
@@ -237,7 +238,7 @@ services:
       postgresql:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8086:8086"
     environment:
@@ -251,40 +252,45 @@ services:
     networks:
       - ledger-net
 
-  # outbox-publisher: (stub service — no Java source yet, disabled until implemented)
-  #   build:
-  #     context: ../microservices/outbox-publisher
-  #     dockerfile: Dockerfile
-  #   container_name: outbox-publisher
-  #   depends_on:
-  #     oracle-xe:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_started
-  #   ports:
-  #     - "8087:8087"
-  #   environment:
-  #     - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-xe:1521/XE
-  #     - SPRING_DATASOURCE_USERNAME=ledger_master
-  #     - SPRING_DATASOURCE_PASSWORD=MasterSecretPassword123
-  #     - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-  #   networks:
-  #     - ledger-net
+  outbox-publisher:
+    build:
+      context: ../microservices/outbox-publisher
+      dockerfile: Dockerfile
+    container_name: outbox-publisher
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-xe:1521/XEPDB1
+      - SPRING_DATASOURCE_USERNAME=ledger_master
+      - SPRING_DATASOURCE_PASSWORD=MasterSecretPassword123
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - OUTBOX_POLL_INTERVAL_MS=5000
+      - OUTBOX_RETRY_INTERVAL_MS=30000
+      - OUTBOX_BATCH_SIZE=50
+      - OUTBOX_MAX_RETRIES=5
+    networks:
+      - ledger-net
 
-  # analytics-service: (stub service — no Java source yet, disabled until implemented)
-  #   build:
-  #     context: ../microservices/analytics-service
-  #     dockerfile: Dockerfile
-  #   container_name: analytics-service
-  #   depends_on:
-  #     kafka:
-  #       condition: service_started
-  #   ports:
-  #     - "8088:8088"
-  #   environment:
-  #     - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-  #   networks:
-  #     - ledger-net
+  analytics-service:
+    build:
+      context: ../microservices/analytics-service
+      dockerfile: Dockerfile
+    container_name: analytics-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ANALYTICS_SERVICE_HOST=analytics-service
+    networks:
+      - ledger-net
 
   # ==========================================
   # Legacy monolith (kept for reference — disabled)

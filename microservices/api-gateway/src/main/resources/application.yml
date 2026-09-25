@@ -45,6 +45,12 @@ spring:
           predicates:
             - Path=/api/v1/telemetry/**
 
+        # Analytics Service
+        - id: analytics-service
+          uri: http://${ANALYTICS_SERVICE_HOST:analytics-service}:8088
+          predicates:
+            - Path=/api/v1/analytics/**
+
 app:
   security:
     jwt-secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}

@@ -2,6 +2,9 @@ package com.bank.transaction.service;
 
 import com.bank.transaction.dto.MutationRequest;
 import com.bank.transaction.dto.MutationResponse;
+import com.bank.transaction.exception.AccountNotFoundException;
+import com.bank.transaction.exception.CurrencyMismatchException;
+import com.bank.transaction.exception.InsufficientFundsException;
 import com.bank.transaction.model.Account;
 import com.bank.transaction.model.AuditLog;
 import com.bank.transaction.model.OutboxEvent;
@@ -16,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,6 +42,7 @@ public class LedgerMutationService {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
+    private final TelemetryService telemetryService;
 
     @Value("${app.idempotency.ttl-hours:24}")
     private long idempotencyTtlHours;
@@ -51,7 +53,8 @@ public class LedgerMutationService {
                                  AuditLogRepository auditLogRepository,
                                  KafkaTemplate<String, String> kafkaTemplate,
                                  ObjectMapper objectMapper,
-                                 StringRedisTemplate redisTemplate) {
+                                 StringRedisTemplate redisTemplate,
+                                 TelemetryService telemetryService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.outboxEventRepository = outboxEventRepository;
@@ -59,10 +62,13 @@ public class LedgerMutationService {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
+        this.telemetryService = telemetryService;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public MutationResponse mutateBalance(MutationRequest request, String username) {
+        long methodStart = System.nanoTime();
+
         // 1. Idempotency check — Redis-backed with TTL
         String idempotencyKey = request.getIdempotencyKey();
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
@@ -73,6 +79,7 @@ public class LedgerMutationService {
                     MutationResponse cached = objectMapper.readValue(cachedJson, MutationResponse.class);
                     cached.setCachedIdempotentResponse(true);
                     log.info("[transaction-service] Idempotent hit for key={}", idempotencyKey);
+                    telemetryService.recordMutation(true, System.nanoTime() - methodStart);
                     return cached;
                 } catch (Exception e) {
                     log.warn("[transaction-service] Failed to deserialize cached idempotency response for key={}: {}", idempotencyKey, e.getMessage());
@@ -81,12 +88,15 @@ public class LedgerMutationService {
         }
 
         // 2. Pessimistic lock on account row
+        long lockStart = System.nanoTime();
         Account account = accountRepository.findByIdForUpdate(request.getAccountId())
-                .orElseThrow(() -> new RuntimeException("Account with ID " + request.getAccountId() + " not found."));
+                .orElseThrow(() -> new AccountNotFoundException(
+                        "Account with ID " + request.getAccountId() + " not found."));
+        telemetryService.recordLockWait(System.nanoTime() - lockStart);
 
         // 3. Currency validation
         if (request.getCurrency() != null && !account.getCurrency().equalsIgnoreCase(request.getCurrency())) {
-            throw new RuntimeException("Currency mismatch: account=" + account.getCurrency()
+            throw new CurrencyMismatchException("Currency mismatch: account=" + account.getCurrency()
                     + ", request=" + request.getCurrency());
         }
 
@@ -103,7 +113,7 @@ public class LedgerMutationService {
                         account.getAccountId(), request.getTargetAccountId(), amount,
                         account.getCurrency(), account.getCurrency(),
                         request.getTransactionType(), failRef, "FAILED", "INSUFFICIENT_FUNDS"));
-                throw new RuntimeException("Insufficient balance. Available: ₱"
+                throw new InsufficientFundsException("Insufficient balance. Available: ₱"
                         + beforeBalance + ", Requested: ₱" + amount);
             }
             afterBalance = beforeBalance.subtract(amount);
@@ -172,32 +182,29 @@ public class LedgerMutationService {
             }
         }
 
-        // 11. Publish outbox event to Kafka immediately (best-effort)
-        publishToKafka(outbox, payload);
+        // 11. Publish outbox event to Kafka immediately (best-effort, fire-and-forget)
+        // The dedicated outbox-publisher service will pick up any events that fail
+        // here by polling OUTBOX_EVENT rows with status = 'PENDING' every 5 seconds.
+        try {
+            kafkaTemplate.send("ledger.transaction.events",
+                    String.valueOf(outbox.getTransactionId()), payload);
+            outbox.setStatus("PROCESSED");
+            outbox.setProcessedDate(LocalDateTime.now());
+            outboxEventRepository.save(outbox);
+        } catch (Exception e) {
+            // Leave status as PENDING — outbox-publisher will retry
+            log.warn("[transaction-service] Immediate Kafka publish failed for eventId={}, " +
+                     "outbox-publisher will retry: {}", outbox.getEventId(), e.getMessage());
+        }
+
+        // Record mutation telemetry (non-idempotent path)
+        telemetryService.recordMutation(false, System.nanoTime() - methodStart);
 
         return response;
     }
 
-    // Scheduled fallback poller for any PENDING outbox events missed
-    @Scheduled(fixedDelay = 5000)
-    @Transactional
-    public void pollPendingOutboxEvents() {
-        List<OutboxEvent> pending = outboxEventRepository.findByStatusOrderByCreatedDateAsc("PENDING");
-        for (OutboxEvent event : pending) {
-            publishToKafka(event, event.getPayload());
-        }
-    }
-
-    private void publishToKafka(OutboxEvent event, String payload) {
-        try {
-            kafkaTemplate.send("ledger.transaction.events",
-                    String.valueOf(event.getTransactionId()), payload);
-            event.setStatus("PROCESSED");
-            event.setProcessedDate(LocalDateTime.now());
-            outboxEventRepository.save(event);
-        } catch (Exception e) {
-            event.setStatus("FAILED");
-            outboxEventRepository.save(event);
-        }
-    }
+    // Scheduled fallback poller REMOVED — responsibility moved to the dedicated
+    // outbox-publisher microservice (microservices/outbox-publisher).
+    // The outbox-publisher polls OUTBOX_EVENT WHERE status='PENDING' every 5 s
+    // and retries FAILED rows every 30 s, providing at-least-once delivery.
 }
