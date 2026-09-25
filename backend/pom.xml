@@ -21,6 +21,8 @@
     <modules>
         <module>ledger-common</module>
         <module>gateway</module>
+        <module>auth-service</module>
+        <module>account-service</module>
         <module>ledger-core</module>
         <module>event-consumers</module>
         <module>notification-service</module>

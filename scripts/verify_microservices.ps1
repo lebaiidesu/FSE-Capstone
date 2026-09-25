@@ -10,7 +10,9 @@ Write-Host "=======================================================" -Foreground
 Write-Host "`n[1/4] Checking Microservice Containers & Port Mappings..." -ForegroundColor Cyan
 $services = @(
     @{ Name = "api-gateway-container"; Port = 8080; Role = "Spring Cloud API Gateway" },
-    @{ Name = "ledger-core-container"; Port = 8083; Role = "Core OLTP Engine (Oracle + Redis)" },
+    @{ Name = "auth-service-container"; Port = 8081; Role = "Auth & IAM Service (JWT + Redis Token Matrix)" },
+    @{ Name = "account-service-container"; Port = 8082; Role = "Customer Account & Balance Service" },
+    @{ Name = "ledger-core-container"; Port = 8083; Role = "Core OLTP Double-Entry Engine (Oracle + Redis)" },
     @{ Name = "event-consumers-container"; Port = 8085; Role = "Audit & Reconciliation Sweep (PostgreSQL)" },
     @{ Name = "notification-service-container"; Port = 8087; Role = "Customer Notification Consumer (PostgreSQL)" }
 )
@@ -28,6 +30,8 @@ foreach ($s in $services) {
 Write-Host "`n[2/4] Testing Direct Service Health Endpoints..." -ForegroundColor Cyan
 $healthEndpoints = @(
     @{ Name = "Gateway (Front Door)"; Url = "http://localhost:8080/actuator/health" },
+    @{ Name = "Auth Service"; Url = "http://localhost:8081/actuator/health" },
+    @{ Name = "Account Service"; Url = "http://localhost:8082/actuator/health" },
     @{ Name = "Ledger Core"; Url = "http://localhost:8083/actuator/health" },
     @{ Name = "Event Consumers"; Url = "http://localhost:8085/actuator/health" },
     @{ Name = "Notification Service"; Url = "http://localhost:8087/actuator/health" }

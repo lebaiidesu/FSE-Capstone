@@ -6,4 +6,4 @@ scrape_configs:
   - job_name: 'core-retail-ledger'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['api-gateway:8080', 'transaction-service:8083']
+      - targets: ['api-gateway:8080', 'auth-service:8081', 'account-service:8082', 'ledger-core:8083', 'event-consumers:8085', 'notification-service:8087']

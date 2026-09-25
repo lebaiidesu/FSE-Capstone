@@ -84,6 +84,8 @@ services:
     command: ["java", "-Dserver.port=8080", "-jar", "/app/app.jar"]
     depends_on:
       - redis
+      - auth-service
+      - account-service
       - ledger-core
     ports:
       - "8080:8080"
@@ -91,12 +93,55 @@ services:
       - SPRING_APPLICATION_NAME=api-gateway
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
+      - AUTH_SERVICE_URI=http://auth-service:8081
+      - ACCOUNT_SERVICE_URI=http://account-service:8082
       - LEDGER_CORE_URI=http://ledger-core:8083
       - EVENT_CONSUMERS_URI=http://event-consumers:8085
     networks:
       - ledger-net
 
-  # 2. Ledger Core Engine (Oracle OLTP Master, Redis Idempotency, Outbox Publisher, Port 8083)
+  # 2. Auth Service (Dedicated IAM / Login / Token Issuance, Port 8081)
+  auth-service:
+    image: core-retail-ledger-engine:latest
+    container_name: auth-service-container
+    volumes:
+      - ./../backend/auth-service/target/auth-service-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8081", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+      - redis
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_APPLICATION_NAME=auth-service
+      - SPRING_DATASOURCE_ORACLE_URL=jdbc:oracle:thin:@//oracle-xe:1521/XEPDB1
+      - SPRING_DATASOURCE_ORACLE_USERNAME=ledger_master
+      - SPRING_DATASOURCE_ORACLE_PASSWORD=MasterSecretPassword123
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+    networks:
+      - ledger-net
+
+  # 3. Account Service (Customer Account & Balance Queries, Port 8082)
+  account-service:
+    image: core-retail-ledger-engine:latest
+    container_name: account-service-container
+    volumes:
+      - ./../backend/account-service/target/account-service-1.0.0-SNAPSHOT.jar:/app/app.jar
+    command: ["java", "-Dserver.port=8082", "-jar", "/app/app.jar"]
+    depends_on:
+      - oracle-xe
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_APPLICATION_NAME=account-service
+      - SPRING_DATASOURCE_ORACLE_URL=jdbc:oracle:thin:@//oracle-xe:1521/XEPDB1
+      - SPRING_DATASOURCE_ORACLE_USERNAME=ledger_master
+      - SPRING_DATASOURCE_ORACLE_PASSWORD=MasterSecretPassword123
+    networks:
+      - ledger-net
+
+  # 4. Ledger Core Engine (Oracle OLTP Master, Redis Idempotency, Outbox Publisher, Port 8083)
   ledger-core:
     image: core-retail-ledger-engine:latest
     container_name: ledger-core-container
