@@ -4,25 +4,27 @@ server:
 spring:
   application:
     name: event-consumers
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL}
-    username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.h2.Driver}
+  # No spring.datasource / spring.jpa.database-platform here on purpose:
+  # this service has TWO datasources (see EventConsumersDataSourceConfig + app.datasource.*),
+  # and a global dialect would be applied to both. Hibernate auto-detects each dialect.
   sql:
     init:
       mode: never
-  jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    hibernate:
-      ddl-auto: update
+  jackson:
+    deserialization:
+      use-big-decimal-for-floats: true   # money in events is read as exact BigDecimal, never double
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
-      enable-auto-commit: true
+      # enable-auto-commit left at Spring's default (false): offsets are committed by the
+      # listener container only AFTER a record is processed, so a crash cannot lose events.
+    producer:   # used only by the DeadLetterPublishingRecoverer (-> transaction-events.DLT)
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
 
 app:
   datasource:

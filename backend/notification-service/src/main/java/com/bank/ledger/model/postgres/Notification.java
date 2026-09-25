@@ -3,8 +3,15 @@ package com.bank.ledger.model.postgres;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * One customer alert per ledger leg.
+ * UNIQUE (reference_no, account_id): an internal transfer produces two alerts
+ * (sender DEBIT + receiver CREDIT), and a redelivered event can never create a duplicate.
+ */
 @Entity
-@Table(name = "NOTIFICATION")
+@Table(name = "NOTIFICATION",
+       uniqueConstraints = @UniqueConstraint(name = "uq_notification_ref_account",
+                                             columnNames = {"reference_no", "account_id"}))
 public class Notification {
 
     @Id
@@ -15,7 +22,10 @@ public class Notification {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
-    @Column(name = "reference_no", nullable = false, unique = true, length = 64)
+    @Column(name = "account_id", nullable = false)
+    private Long accountId;
+
+    @Column(name = "reference_no", nullable = false, length = 64)
     private String referenceNo;
 
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
@@ -32,15 +42,9 @@ public class Notification {
 
     public Notification() {}
 
-    public Notification(Long customerId, String message, String status) {
+    public Notification(Long customerId, Long accountId, String referenceNo, String message, String status) {
         this.customerId = customerId;
-        this.message = message;
-        this.status = status;
-        this.createdDate = LocalDateTime.now();
-    }
-
-    public Notification(Long customerId, String referenceNo, String message, String status) {
-        this.customerId = customerId;
+        this.accountId = accountId;
         this.referenceNo = referenceNo;
         this.message = message;
         this.status = status;
@@ -52,6 +56,9 @@ public class Notification {
 
     public Long getCustomerId() { return customerId; }
     public void setCustomerId(Long customerId) { this.customerId = customerId; }
+
+    public Long getAccountId() { return accountId; }
+    public void setAccountId(Long accountId) { this.accountId = accountId; }
 
     public String getReferenceNo() { return referenceNo; }
     public void setReferenceNo(String referenceNo) { this.referenceNo = referenceNo; }

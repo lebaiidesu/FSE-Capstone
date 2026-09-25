@@ -41,8 +41,10 @@ public class TransactionOutboxPayload {
         this.entries = entries;
     }
 
+    /** One ledger leg. customerId identifies the account owner (used for per-leg alerts). */
     public static class EntryPayload {
         private Long accountId;
+        private Long customerId;
         private String entryType; // 'DEBIT' or 'CREDIT'
         private BigDecimal amount;
         private String currency;
@@ -51,9 +53,10 @@ public class TransactionOutboxPayload {
 
         public EntryPayload() {}
 
-        public EntryPayload(Long accountId, String entryType, BigDecimal amount, String currency,
+        public EntryPayload(Long accountId, Long customerId, String entryType, BigDecimal amount, String currency,
                             BigDecimal beforeBalance, BigDecimal afterBalance) {
             this.accountId = accountId;
+            this.customerId = customerId;
             this.entryType = entryType;
             this.amount = amount;
             this.currency = currency;
@@ -63,6 +66,9 @@ public class TransactionOutboxPayload {
 
         public Long getAccountId() { return accountId; }
         public void setAccountId(Long accountId) { this.accountId = accountId; }
+
+        public Long getCustomerId() { return customerId; }
+        public void setCustomerId(Long customerId) { this.customerId = customerId; }
 
         public String getEntryType() { return entryType; }
         public void setEntryType(String entryType) { this.entryType = entryType; }

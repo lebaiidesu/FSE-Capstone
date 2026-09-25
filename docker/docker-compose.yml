@@ -111,7 +111,9 @@ services:
       - "8083:8083"
     environment:
       - SPRING_APPLICATION_NAME=ledger-core
-      - SPRING_DATASOURCE_URL=jdbc:h2:mem:ledgerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=Oracle
+      - SPRING_DATASOURCE_ORACLE_URL=jdbc:oracle:thin:@//oracle-xe:1521/XEPDB1
+      - SPRING_DATASOURCE_ORACLE_USERNAME=ledger_master
+      - SPRING_DATASOURCE_ORACLE_PASSWORD=MasterSecretPassword123
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -133,10 +135,12 @@ services:
       - "8085:8085"
     environment:
       - SPRING_APPLICATION_NAME=event-consumers
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/ledger_audit_db
-      - SPRING_DATASOURCE_USERNAME=audit_user
-      - SPRING_DATASOURCE_PASSWORD=AuditSecretPassword123
-      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_DATASOURCE_POSTGRES_URL=jdbc:postgresql://postgresql:5432/ledger_audit_db
+      - SPRING_DATASOURCE_POSTGRES_USERNAME=audit_user
+      - SPRING_DATASOURCE_POSTGRES_PASSWORD=AuditSecretPassword123
+      - SPRING_DATASOURCE_ORACLE_URL=jdbc:oracle:thin:@//oracle-xe:1521/XEPDB1
+      - SPRING_DATASOURCE_ORACLE_USERNAME=ledger_master
+      - SPRING_DATASOURCE_ORACLE_PASSWORD=MasterSecretPassword123
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     networks:
       - ledger-net
