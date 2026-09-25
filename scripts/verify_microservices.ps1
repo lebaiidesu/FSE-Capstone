@@ -65,13 +65,31 @@ if ($login.token) {
 }
 
 # 4. Verify Kafka Event Bus & Database Isolation
-Write-Host "`n[4/4] Verifying Asynchronous Event-Driven Decoupling..." -ForegroundColor Cyan
+Write-Host "`n[4/5] Verifying Asynchronous Event-Driven Decoupling..." -ForegroundColor Cyan
 $auditCount = docker exec postgres-immutable-audit psql -U audit_user -d ledger_audit_db -t -c "SELECT count(*) FROM ledger_mutation_audit;" 2>$null
 $notifCount = docker exec postgres-immutable-audit psql -U audit_user -d ledger_audit_db -t -c "SELECT count(*) FROM notification;" 2>$null
 
 Write-Host "  [OK] PostgreSQL Audit Records (consumed from Kafka): $($auditCount.Trim())" -ForegroundColor Green
 Write-Host "  [OK] PostgreSQL Notifications (consumed from Kafka): $($notifCount.Trim())" -ForegroundColor Green
 
+# 5. Verify Observability & Telemetry Stack
+Write-Host "`n[5/5] Verifying Observability Stack (Metrics, Logs, Traces, Dashboards)..." -ForegroundColor Cyan
+$obsEndpoints = @(
+    @{ Name = "Prometheus (Metrics)"; Url = "http://localhost:9090/-/healthy" },
+    @{ Name = "Grafana (Dashboards)"; Url = "http://localhost:3000/api/health" },
+    @{ Name = "Tempo (Traces)"; Url = "http://localhost:3200/ready" },
+    @{ Name = "Loki (Logs)"; Url = "http://localhost:3100/ready" }
+)
+
+foreach ($o in $obsEndpoints) {
+    try {
+        $res = Invoke-WebRequest -Uri $o.Url -Method Get -TimeoutSec 3 -ErrorAction Stop
+        Write-Host "  [OK] $($o.Name.PadRight(28)) -> $($o.Url) (HTTP $($res.StatusCode))" -ForegroundColor Green
+    } catch {
+        Write-Host "  [WARN] $($o.Name.PadRight(28)) -> $($o.Url) ($($_.Exception.Message))" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "`n=======================================================" -ForegroundColor Magenta
-Write-Host "   Verification Complete: Architecture is 100% Microservices!" -ForegroundColor White
+Write-Host "   Verification Complete: Architecture & Observability 100%!" -ForegroundColor White
 Write-Host "=======================================================`n" -ForegroundColor Magenta

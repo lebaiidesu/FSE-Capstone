@@ -213,8 +213,46 @@ services:
       - ledger-net
 
   # =========================================================================
-  # Layer 4: Observability & Telemetry
+  # Layer 4: Observability & Telemetry (Full OpenTelemetry, Prometheus, Loki, Tempo, Grafana)
   # =========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.88.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector.yml"]
+    volumes:
+      - ./otel-collector.yml:/etc/otel-collector.yml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8889:8889"   # Prometheus metrics exporter
+    depends_on:
+      - tempo
+    networks:
+      - ledger-net
+
+  tempo:
+    image: grafana/tempo:2.2.4
+    container_name: tempo-traces
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"   # Tempo HTTP
+      - "4317"        # OTLP gRPC
+    networks:
+      - ledger-net
+
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki-logs
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"   # Loki HTTP
+    networks:
+      - ledger-net
+
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: prometheus-telemetry
@@ -232,6 +270,8 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+      - tempo
+      - loki
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
